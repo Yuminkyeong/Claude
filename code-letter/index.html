@@ -1,6 +1,6 @@
 <title>코드 편지</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="코드 한 줄이 트리가, 하트가, 내 사진이 되는 편지">
+<meta name="description" content="코드 한 줄이 입체 트리가, 하트가, 내 사진이 되는 편지">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -206,7 +206,7 @@ body.recording #dock, body.recording #muteBtn, body.recording #skipHint { displa
     <header>
       <p class="eyebrow">Code Letter · 2026.12.25</p>
       <h1>코드 편지</h1>
-      <p class="lead">이름과 한마디를 적으면 그 말이 <code>const msg</code>가 되어 실행되고, 글자들이 날아가 트리나 하트, 내가 고른 사진 모양으로 모이는 링크가 만들어져요.</p>
+      <p class="lead">이름과 한마디를 적으면 그 말이 <code>const msg</code>가 되어 실행되고, 글자들이 날아가 입체 트리나 하트, 내가 고른 사진 모양으로 모여 빙글빙글 도는 링크가 만들어져요.</p>
     </header>
 
     <form class="card" id="form" novalidate>
@@ -314,7 +314,7 @@ body.recording #dock, body.recording #muteBtn, body.recording #skipHint { displa
   <p id="skipHint" hidden>tap to skip</p>
   <button type="button" class="corner-btn" id="muteBtn" hidden>sound on</button>
   <div id="dock">
-    <p id="tapHint" hidden>하늘을 누르면 불꽃이 터져요</p>
+    <p id="tapHint" hidden>드래그하면 돌아가고, 누르면 불꽃이 터져요</p>
     <div id="endBar" hidden>
       <button type="button" class="btn-ghost" id="replayBtn">다시 보기</button>
       <button type="button" class="btn-ghost" id="recBtn">영상 저장</button>
@@ -377,9 +377,10 @@ const REG = {
 };
 
 /* =========================================================
-   Shapes. region(x, y): x in height units centred on 0, y in 0..1 from the top.
+   3D shapes. inside(x, y, z): y runs 0 (top) .. 1 (bottom), x and z are
+   centred on 0 in the same units. Returns a region name, a colour, or null.
    ========================================================= */
-const circle = (x, y, cx, cy, r) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
+const sph = (x, y, z, cx, cy, cz, r) => (x - cx) ** 2 + (y - cy) ** 2 + (z - cz) ** 2 <= r * r;
 function inPoly(x, y, P) {
   let c = false;
   for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
@@ -391,46 +392,53 @@ const STAR = Array.from({ length: 10 }, (_, i) => {
   const r = i % 2 ? 0.2 : 0.5, a = -Math.PI / 2 + i * Math.PI / 5;
   return [Math.cos(a) * r, 0.53 + Math.sin(a) * r];
 });
+const TIERS = [[0, 0.36, 0.2], [0.18, 0.63, 0.33], [0.38, 0.9, 0.44]];
 const SHAPES = {
-  tree: { label: '트리', fn: 'tree', aspect: 0.92, finale: 'star', orn: 0.12, N: 340,
-    region(x, y) {
-      const tiers = [[0, 0.36, 0.2], [0.18, 0.63, 0.33], [0.38, 0.9, 0.44]];
-      if (tiers.some(([A, B, w]) => y >= A && y <= B && Math.abs(x) <= w * (y - A) / (B - A))) return 'leaf';
-      if (y > 0.9 && Math.abs(x) <= 0.065) return 'trunk';
+  tree: { key: 'tree', label: '트리', fn: 'tree', hx: 0.46, hz: 0.46, finale: 'star', orn: 0.12, N: 720,
+    inside(x, y, z) {
+      const r = Math.hypot(x, z);
+      for (const [A, B, w] of TIERS) if (y >= A && y <= B && r <= w * (y - A) / (B - A)) return 'leaf';
+      if (y > 0.9 && y <= 1 && r <= 0.065) return 'trunk';
       return null;
     } },
-  heart: { label: '하트', fn: 'heart', aspect: 1.0, finale: 'beat', orn: 0.05, N: 380,
-    region(x, y) {
-      const X = x * 2.3, Y = 1.2 - y * 2.25, a = X * X + Y * Y - 1;
-      return a * a * a - X * X * Y * Y * Y <= 0 ? 'heart' : null;
+  heart: { key: 'heart', label: '하트', fn: 'heart', hx: 0.52, hz: 0.32, finale: 'beat', orn: 0.05, N: 720,
+    inside(x, y, z) {
+      const X = x * 2.3, U = 1.2 - y * 2.25, D = z * 2.3, a = X * X + 2.25 * D * D + U * U - 1;
+      return a * a * a - X * X * U * U * U - 0.1125 * D * D * U * U * U <= 0 ? 'heart' : null;
     } },
-  star: { label: '별', fn: 'star', aspect: 1.0, finale: 'breathe', orn: 0.06, N: 340,
-    region: (x, y) => inPoly(x, y, STAR) ? 'star' : null },
-  snowman: { label: '눈사람', fn: 'snowman', aspect: 0.75, finale: 'breathe', orn: 0.03, N: 360,
-    region(x, y) {
-      if (y >= 0.03 && y < 0.125 && Math.abs(x) < 0.09) return 'hat';
-      if (y >= 0.125 && y < 0.15 && Math.abs(x) < 0.16) return 'hat';
-      const head = circle(x, y, 0, 0.27, 0.15), body = circle(x, y, 0, 0.66, 0.3);
-      if (y >= 0.39 && y < 0.45 && (head || body)) return 'scarf';
-      if (head) return (x > 0.01 && x < 0.11 && Math.abs(y - 0.28) < 0.025) ? 'nose' : 'snow';
-      if (body) return 'snow';
+  star: { key: 'star', label: '별', fn: 'star', hx: 0.5, hz: 0.18, finale: 'breathe', orn: 0.06, N: 640,
+    inside(x, y, z) {
+      if (!inPoly(x, y, STAR)) return null;
+      const r = Math.hypot(x, y - 0.53);
+      return Math.abs(z) <= 0.025 + 0.14 * (1 - Math.min(1, r / 0.5)) ? 'star' : null;
+    } },
+  snowman: { key: 'snowman', label: '눈사람', fn: 'snowman', hx: 0.32, hz: 0.32, finale: 'breathe', orn: 0.03, N: 720,
+    inside(x, y, z) {
+      const rho = Math.hypot(x, z);
+      if (y >= 0.03 && y < 0.125 && rho < 0.09) return 'hat';
+      if (y >= 0.125 && y < 0.15 && rho < 0.16) return 'hat';
+      if (Math.hypot(x, y - 0.28) < 0.028 && z > 0 && z < 0.25) return 'nose';
+      const head = sph(x, y, z, 0, 0.27, 0, 0.15), body = sph(x, y, z, 0, 0.66, 0, 0.3);
+      if (y >= 0.39 && y < 0.45 && rho < 0.19 && (head || body || rho < 0.17)) return 'scarf';
+      return head || body ? 'snow' : null;
+    } },
+  cake: { key: 'cake', label: '케이크', fn: 'cake', hx: 0.48, hz: 0.48, finale: 'breathe', orn: 0.05, N: 720,
+    inside(x, y, z) {
+      const rho = Math.hypot(x, z);
+      if ((x / 0.045) ** 2 + ((y - 0.07) / 0.065) ** 2 + (z / 0.045) ** 2 <= 1) return 'flame';
+      if (y >= 0.13 && y < 0.32 && rho < 0.03) return 'wax';
+      if (y >= 0.32 && y < 0.56 && rho < 0.26) return 'cream';
+      if (y >= 0.56 && y < 0.62 && rho < 0.42) return 'cream';
+      if (y >= 0.62 && y < 0.9 && rho < 0.42) return 'sponge';
+      if (y >= 0.9 && y < 0.96 && rho < 0.48) return 'plate';
       return null;
     } },
-  cake: { label: '케이크', fn: 'cake', aspect: 1.0, finale: 'breathe', orn: 0.05, N: 360,
-    region(x, y) {
-      if ((x / 0.045) ** 2 + ((y - 0.07) / 0.065) ** 2 <= 1) return 'flame';
-      if (y >= 0.13 && y < 0.32 && Math.abs(x) < 0.03) return 'wax';
-      if (y >= 0.32 && y < 0.56 && Math.abs(x) < 0.26) return 'cream';
-      if (y >= 0.56 && y < 0.62 && Math.abs(x) < 0.42) return 'cream';
-      if (y >= 0.62 && y < 0.9 && Math.abs(x) < 0.42) return 'sponge';
-      if (y >= 0.9 && y < 0.96 && Math.abs(x) < 0.48) return 'plate';
-      return null;
-    } },
-  gift: { label: '선물', fn: 'gift', aspect: 0.95, finale: 'breathe', orn: 0.05, N: 360,
-    region(x, y) {
-      if (circle(x, y, -0.12, 0.13, 0.1) || circle(x, y, 0.12, 0.13, 0.1)) return 'ribbon';
-      if (y >= 0.22 && y < 0.34 && Math.abs(x) < 0.46) return Math.abs(x) < 0.05 ? 'ribbon' : 'box';
-      if (y >= 0.34 && y < 0.98 && Math.abs(x) < 0.42) return (Math.abs(x) < 0.05 || (y > 0.6 && y < 0.66)) ? 'ribbon' : 'box';
+  gift: { key: 'gift', label: '선물', fn: 'gift', hx: 0.46, hz: 0.46, finale: 'breathe', orn: 0.05, N: 720,
+    inside(x, y, z) {
+      if (sph(x, y, z, -0.12, 0.13, 0, 0.1) || sph(x, y, z, 0.12, 0.13, 0, 0.1)) return 'ribbon';
+      const band = Math.abs(x) < 0.05 || Math.abs(z) < 0.05;
+      if (y >= 0.22 && y < 0.34 && Math.abs(x) < 0.46 && Math.abs(z) < 0.46) return band ? 'ribbon' : 'box';
+      if (y >= 0.34 && y < 0.98 && Math.abs(x) < 0.42 && Math.abs(z) < 0.42) return band ? 'ribbon' : 'box';
       return null;
     } },
 };
@@ -442,14 +450,32 @@ function liftColor(c) {
   const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   return L < 95 ? mix(c, [205, 214, 235], (95 - L) / 170) : c;
 }
+// a flat picture becomes a puffed relief: thicker in the middle, thin at the outline
 function cellShape(cells, w, h, label) {
+  const dist = new Float32Array(w * h).fill(1e9), q = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (!cells[i]) { dist[i] = 0; q.push(i); }
+    else if (x === 0 || y === 0 || x === w - 1 || y === h - 1) { dist[i] = 1; q.push(i); }
+  }
+  for (let qi = 0; qi < q.length; qi++) {
+    const i = q[qi], x = i % w, y = (i / w) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const j = ny * w + nx;
+      if (dist[j] > dist[i] + 1) { dist[j] = dist[i] + 1; q.push(j); }
+    }
+  }
+  let dmax = 1; for (const d of dist) if (d < 1e8) dmax = Math.max(dmax, d);
   const aspect = w / h;
-  return { label, fn: 'draw', aspect, finale: 'breathe', orn: 0.03, N: 480, custom: true,
-    region(x, y) {
+  return { key: null, label, fn: 'draw', hx: aspect / 2, hz: 0.18, finale: 'breathe', orn: 0.03, N: 760, custom: true,
+    inside(x, y, z) {
       const cx = Math.floor((x / aspect + 0.5) * w), cy = Math.floor(y * h);
       if (cx < 0 || cy < 0 || cx >= w || cy >= h) return null;
-      const v = cells[cy * w + cx];
-      return v ? unpack332(v) : null;
+      const i = cy * w + cx, v = cells[i];
+      if (!v) return null;
+      return Math.abs(z) <= 0.03 + 0.13 * Math.sqrt(dist[i] / dmax) ? unpack332(v) : null;
     } };
 }
 
@@ -472,8 +498,9 @@ function toCells(r, thr) {
   let bg = null;
   if (!useAlpha) {
     const ch = [[], [], []];
-    for (let x = 0; x < gw; x++) for (const y of [0, gh - 1]) { const i = (y * gw + x) * 4; ch[0].push(data[i]); ch[1].push(data[i + 1]); ch[2].push(data[i + 2]); }
-    for (let y = 0; y < gh; y++) for (const x of [0, gw - 1]) { const i = (y * gw + x) * 4; ch[0].push(data[i]); ch[1].push(data[i + 1]); ch[2].push(data[i + 2]); }
+    const add = (x, y) => { const i = (y * gw + x) * 4; ch[0].push(data[i]); ch[1].push(data[i + 1]); ch[2].push(data[i + 2]); };
+    for (let x = 0; x < gw; x++) { add(x, 0); add(x, gh - 1); }
+    for (let y = 0; y < gh; y++) { add(0, y); add(gw - 1, y); }
     bg = ch.map(a => a.sort((p, q) => p - q)[a.length >> 1]);
   }
   const cells = new Uint8Array(n); let count = 0;
@@ -493,11 +520,9 @@ function emojiShape(e) {
   g.textAlign = 'center'; g.textBaseline = 'middle';
   g.font = '128px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
   g.fillText(e, 80, 88);
-  const r = rasterize(c, 160, 160, 40);
-  const t = toCells(r, 0);
+  const t = toCells(rasterize(c, 160, 160, 40), 0);
   let shape = null;
   if (t.useAlpha && t.count > 20) {
-    // crop to content
     let x0 = t.w, y0 = t.h, x1 = -1, y1 = -1;
     for (let y = 0; y < t.h; y++) for (let x = 0; x < t.w; x++) if (t.cells[y * t.w + x]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
     const w = x1 - x0 + 1, h = y1 - y0 + 1, cells = new Uint8Array(w * h);
@@ -509,42 +534,58 @@ function emojiShape(e) {
 }
 const b64 = u8 => { let s = ''; for (const b of u8) s += String.fromCharCode(b); return btoa(s); };
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-
+const imageCache = new Map();
 function resolveShape(s) {
   if (typeof s === 'string' && SHAPES[s]) return SHAPES[s];
   if (s && typeof s === 'object') {
     if (typeof s.e === 'string') return emojiShape(s.e) || SHAPES.heart;
-    if (s.i && s.i.w && s.i.h) { try { return cellShape(unb64(s.i.d), s.i.w, s.i.h, '사진'); } catch { /* fall through */ } }
+    if (s.i && s.i.w && s.i.h) {
+      const k = s.i.w + 'x' + s.i.h + ':' + s.i.d;
+      if (!imageCache.has(k)) { try { imageCache.set(k, cellShape(unb64(s.i.d), s.i.w, s.i.h, '사진')); } catch { imageCache.set(k, null); } }
+      if (imageCache.get(k)) return imageCache.get(k);
+    }
   }
   return SHAPES.tree;
 }
 
-/* ---------- placing glyph cells inside a box ---------- */
-function gridPts(shape, box, s) {
-  const pts = [], rs = s * 0.92, k = Math.ceil(box.w / 2 / s) + 1;
-  let row = 0;
-  for (let y = box.top + s * 0.5; y <= box.top + box.h; y += rs, row++) {
-    const off = (row % 2) * s / 2;
-    for (let i = -k; i <= k; i++) {
-      const x = box.cx + i * s + off;
-      const r = shape.region((x - box.cx) / box.h, (y - box.top) / box.h);
-      if (r) pts.push({ x, y, r });
-    }
+/* ---------- surface sampling: the shell of a voxelised solid, like a drone formation ---------- */
+const sampleCache = new WeakMap();
+function voxelShell(def, step, collect) {
+  const nx = Math.ceil(def.hx / step) + 1, nz = Math.ceil(def.hz / step) + 1, ny = Math.floor(1 / step);
+  const X = 2 * nx + 1, Y = ny + 1, Z = 2 * nz + 1;
+  const grid = new Array(X * Y * Z);
+  const at = (i, j, k) => (i < 0 || j < 0 || k < 0 || i >= X || j >= Y || k >= Z) ? null : grid[(j * Z + k) * X + i];
+  for (let j = 0; j < Y; j++) for (let k = 0; k < Z; k++) for (let i = 0; i < X; i++)
+    grid[(j * Z + k) * X + i] = def.inside((i - nx) * step, j * step, (k - nz) * step);
+  let count = 0;
+  const out = collect ? [] : null;
+  for (let j = 0; j < Y; j++) for (let k = 0; k < Z; k++) for (let i = 0; i < X; i++) {
+    const r = grid[(j * Z + k) * X + i];
+    if (!r) continue;
+    if (at(i + 1, j, k) && at(i - 1, j, k) && at(i, j + 1, k) && at(i, j - 1, k) && at(i, j, k + 1) && at(i, j, k - 1)) continue;
+    count++;
+    if (out) out.push({ x: (i - nx) * step, y: j * step, z: (k - nz) * step, r });
   }
-  return pts;
+  return collect ? out : count;
 }
-function shapePoints(shape, box, N) {
-  let lo = 1.5, hi = 120;
-  for (let i = 0; i < 26; i++) { const m = (lo + hi) / 2; if (gridPts(shape, box, m).length >= N) lo = m; else hi = m; }
-  let pts = gridPts(shape, box, lo);
-  const excess = pts.length - N;
-  if (excess > 0) {
-    const step = pts.length / excess, drop = new Set();
-    for (let i = 0; i < excess; i++) drop.add(Math.floor(i * step + step / 2));
-    pts = pts.filter((_, i) => !drop.has(i));
+function sample3(def, N) {
+  let byN = sampleCache.get(def);
+  if (!byN) { byN = new Map(); sampleCache.set(def, byN); }
+  if (byN.has(N)) return byN.get(N);
+  let lo = 0.014, hi = 0.2;
+  for (let i = 0; i < 12; i++) { const m = (lo + hi) / 2; if (voxelShell(def, m) >= N) lo = m; else hi = m; }
+  const step = lo, all = voxelShell(def, step, true), M = all.length;
+  const pts = [];
+  for (let i = 0; i < N && M; i++) {
+    const p = all[Math.min(M - 1, Math.floor((i + 0.5) * M / N))];
+    pts.push({ x: p.x + (rnd(i * 3 + 1) - 0.5) * step * 0.45, y: p.y + (rnd(i * 3 + 2) - 0.5) * step * 0.45, z: p.z + (rnd(i * 3 + 3) - 0.5) * step * 0.45, r: p.r });
   }
-  pts.sort((a, b) => a.y - b.y || a.x - b.x);
-  return { s: lo, pts };
+  // reading order: layer by layer, then around the vertical axis (left to right for flat pictures)
+  pts.sort((a, b) => Math.round(a.y / step) - Math.round(b.y / step) || (def.custom ? a.x - b.x : Math.atan2(a.z, a.x) - Math.atan2(b.z, b.x)));
+  let rMax = 0.1; for (const p of pts) rMax = Math.max(rMax, Math.hypot(p.x, p.z));
+  const res = { step, pts, rMax };
+  byN.set(N, res);
+  return res;
 }
 function colorFor(r, y, i) {
   if (Array.isArray(r)) return liftColor(r);
@@ -552,6 +593,13 @@ function colorFor(r, y, i) {
   if (r === 'heart') return mix(REG.heart, REG.heart2, clamp(y, 0, 1) * 0.9 + rnd(i) * 0.1);
   const base = REG[r] || C.frost, k = (rnd(i + 5) - 0.5) * 0.16;
   return k > 0 ? mix(base, [255, 255, 255], k) : mix(base, [0, 0, 0], -k);
+}
+// letters for the lights: the message repeats; a short one is joined with the name so it still reads as a phrase
+function glyphSeq(p) {
+  let base = seg(clean(p.m)).filter(c => c.trim());
+  if (!base.length) base = seg('메리크리스마스');
+  const name = seg(clean(p.t)).filter(c => c.trim());
+  return base.length < 6 && name.length ? [...base, '·', ...name, '✦'] : [...base, '✦'];
 }
 
 /* =========================================================
@@ -737,11 +785,26 @@ function ytPlay() { try { YTM.player && YTM.player.playVideo(); } catch { /* ign
 function ytStop() { try { YTM.player && YTM.player.pauseVideo(); } catch { /* ignore */ } $('ytBox').hidden = true; }
 
 /* =========================================================
-   Canvas
+   Canvas + camera
    ========================================================= */
 const cv = $('stage'), ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1, glow = null;
 const REC = { on: false, mr: null, chunks: [], dest: null, result: null, cancelled: false, mime: '' };
+const CAM = { th: -0.5, ph: 0.2, auto: reduce ? 0.00008 : 0.0004, spin: 0, drag: false, c: 1, s: 0, cp: 1, sp: 0 };
+CAM.spin = CAM.auto;
+const VIEW = { cx: 0, cy: 0, sc: 1, top: 0, h: 1, D: 2.6 };
+function camFrame(dt) {
+  if (!CAM.drag) { CAM.spin += (CAM.auto - CAM.spin) * Math.min(1, dt * 0.0015); CAM.th += CAM.spin * dt; }
+  CAM.c = Math.cos(CAM.th); CAM.s = Math.sin(CAM.th); CAM.cp = Math.cos(CAM.ph); CAM.sp = Math.sin(CAM.ph);
+}
+// shape coords -> [screenX, screenY, depth (toward viewer +), perspective factor]
+function proj(x, y, z, k = 1) {
+  const X = x * k, Y = (y - 0.5) * k, Z = z * k;
+  const x1 = X * CAM.c + Z * CAM.s, z1 = -X * CAM.s + Z * CAM.c;
+  const y2 = Y * CAM.cp + z1 * CAM.sp, z2 = -Y * CAM.sp + z1 * CAM.cp;
+  const f = VIEW.D / (VIEW.D - z2);
+  return [VIEW.cx + x1 * VIEW.sc * f, VIEW.cy + y2 * VIEW.sc * f, z2, f];
+}
 function resize() {
   let left = 0, top = 0;
   if (REC.on) {
@@ -762,21 +825,27 @@ function resize() {
   glow.addColorStop(1, 'rgba(242,196,107,0)');
   makeSnow();
   if (S.lines) layoutCode();
-  if (S.shape) relayoutShape();
+  if (S.def) layoutView();
 }
-function sprite(c) {
-  const s = document.createElement('canvas'); s.width = s.height = 64;
+const spriteCache = new Map();
+function spriteFor(c) {
+  const key = pack332(c);
+  let s = spriteCache.get(key);
+  if (s) return s;
+  s = document.createElement('canvas'); s.width = s.height = 64;
   const g = s.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  gr.addColorStop(0, rgb(c, 0.9)); gr.addColorStop(0.35, rgb(c, 0.35)); gr.addColorStop(1, rgb(c, 0));
-  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return s;
+  gr.addColorStop(0, rgb(c, 0.9)); gr.addColorStop(0.3, rgb(c, 0.35)); gr.addColorStop(1, rgb(c, 0));
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  spriteCache.set(key, s);
+  return s;
 }
-const ORN = [C.candle, C.berry, C.ice].map(c => ({ c, img: sprite(c) }));
+const ORN = [C.candle, C.berry, C.ice].map(c => ({ c, img: spriteFor(c) }));
 
 const S = {
   mode: 'compose', phase: 'idle', payload: null, preview: false,
-  lines: null, code: null, parts: [], shape: null, def: null, N: 0, halo: [],
+  lines: null, code: null, parts: [], def: null, form: null, pts: null, N: 0, halo: [],
   tStart: 0, schedule: [], typed: 0, typingDone: 0, runAt: 0, flyAt: 0, flyEnd: 0, litAt: 0,
-  flash: 0, fx: [], rockets: [], fall: [], snow: [], shown: {}, autoFx: 0,
+  flash: 0, fx: [], rockets: [], fall: [], snow: [], shown: {}, autoFx: 0, items: [],
 };
 
 /* ---------- snow ---------- */
@@ -799,7 +868,7 @@ function drawSnow(dt, now) {
 
 /* ---------- code ---------- */
 const clean = s => s.replace(/["`\\\n\r]/g, '').trim();
-function buildLines(p, def) {
+function buildLines(p, def, N) {
   const K = kind => t => [t, kind];
   const c = K('com'), k = K('kw'), s = K('str'), n = K('num'), f = K('fn'), o = K('op'), v = K('id');
   const to = clean(p.t), from = clean(p.f) || '비밀 산타';
@@ -819,20 +888,17 @@ function buildLines(p, def) {
   if (p.s && p.s.i) L.push([k('const '), v('img'), o('  = '), f('load'), o('('), s('"photo.png"'), o(');')]);
   if (typeof p.b === 'string' && MEL[p.b]) L.push([f('play'), o('('), s('"' + MEL[p.b].name + '"'), o(');')]);
   if (p.b && p.b.y) L.push([f('play'), o('('), s('"youtu.be/' + p.b.y + '"'), o(');')]);
-  const fn = def.fn, arg = def.custom ? 'img' : 'h';
   L.push([]);
-  L.push([k('function '), f(fn), o('('), v(arg), o(') {')]);
-  if (def.custom) L.push([o('  '), k('for '), o('('), k('const '), v('px'), k(' of '), v('img'), o(')')]);
-  else L.push([o('  '), k('for '), o('('), k('let '), v('y'), o(' = '), n('0'), o('; '), v('y'), o(' < '), v('h'), o('; '), v('y'), o('++)')]);
-  L.push([o('    '), f('grow'), o('('), v('msg'), o(', '), v(def.custom ? 'px' : 'y'), o(');')]);
+  L.push([k('function '), f(def.fn), o('('), v('n'), o(') {')]);
+  L.push([o('  '), k('for '), o('('), k('let '), v('i'), o(' = '), n('0'), o('; '), v('i'), o(' < '), v('n'), o('; '), v('i'), o('++)')]);
+  L.push([o('    '), f('place'), o('('), v('msg'), o('['), v('i'), o(' % '), v('msg'), o('.'), v('length'), o('], '), v('i'), o(');')]);
   L.push([o('  '), f('light'), o('('), v('to'), o(');')]);
   L.push([o('}')]);
-  L.push([]);
-  L.push([f(fn), o('('), v(def.custom ? 'img' : 'msg.length'), o(');')]);
+  L.push([f(def.fn), o('('), n(String(N)), o(');')]);
   return L;
 }
 const codeFont = sz => `${sz}px "JetBrains Mono","IBM Plex Sans KR",ui-monospace,monospace`;
-const PROMPT = '$ node letter.js';
+const PROMPT = '$ node letter.js --3d';
 function layoutCode() {
   const lines = S.lines;
   ctx.font = codeFont(100);
@@ -857,41 +923,29 @@ function layoutCode() {
   S.code = { sz, lh, x0, y0, chars, promptY: y0 + (lines.length + 1) * lh };
 }
 
-/* ---------- shape on the stage ---------- */
-function shapeBox(def) {
-  const top = Math.max(H * 0.09, 34);
-  const reserve = REC.on ? H * 0.3 : Math.max(H * 0.34, 240);
-  let h = Math.min(H * 0.54, (W * 0.9) / def.aspect, 640, H - top - reserve);
+/* ---------- formation on the stage ---------- */
+function layoutView() {
+  const top = Math.max(H * 0.1, 40);
+  const reserve = REC.on ? H * 0.3 : Math.max(H * 0.35, 250);
+  const span = 2 * S.form.rMax * 0.86 * 1.25;
+  let h = Math.min(H * 0.48, (W * 0.9) / span, 600, H - top - reserve);
   h = Math.max(h, 100);
-  return { cx: W / 2, top, h, w: h * def.aspect };
+  VIEW.top = top; VIEW.h = h; VIEW.cx = W / 2; VIEW.cy = top + h / 2; VIEW.sc = h * 0.86;
+  S.spx = S.form.step * VIEW.sc;
 }
-function layoutShape(def, N) {
-  const box = shapeBox(def);
-  const { s, pts } = shapePoints(def, box, N);
-  return { box, s, pts };
-}
-function relayoutShape() {
-  const t = layoutShape(S.def, S.N);
-  t.pts.forEach((p, i) => { if (S.shape.pts[i]) Object.assign(S.shape.pts[i], { x: p.x, y: p.y }); });
-  S.shape.box = t.box; S.shape.s = t.s;
-}
-function decorate(shape, def, msg) {
-  const chars = seg(msg).filter(c => c.trim());
-  if (!chars.length) chars.push('*');
-  let li = 0;
-  shape.pts.forEach((p, i) => {
-    const v = (p.y - shape.box.top) / shape.box.h;
+function decorate(pts, def, seq) {
+  pts.forEach((p, i) => {
     p.ph = rnd(i + 19) * 6.28;
     if (p.r === 'trunk') { p.glyph = '|'; p.col = REG.trunk; p.orn = null; return; }
-    p.glyph = chars[li++ % chars.length];
-    p.col = colorFor(p.r, v, i);
+    p.glyph = seq[i % seq.length];
+    p.col = colorFor(p.r, p.y, i);
     p.orn = rnd(i * 7 + 1) < def.orn ? ORN[Math.floor(rnd(i + 11) * 3)] : null;
   });
 }
 
 /* ---------- play ---------- */
 async function loadFonts(p) {
-  const text = p.t + p.f + p.m + '비밀산타메리크리스마스';
+  const text = p.t + p.f + p.m + '비밀산타메리크리스마스✦·';
   try {
     await Promise.race([
       Promise.all([
@@ -905,53 +959,54 @@ async function loadFonts(p) {
 }
 function prepare(p) {
   S.def = resolveShape(p.s);
-  S.lines = buildLines(p, S.def);
-  layoutCode();
-  const chars = S.code.chars;
-  S.parts = [];
-  chars.forEach((c, ci) => { if (!c.space) S.parts.push({ ci, ch: c.ch, col: C[c.kind] }); });
   S.N = S.def.N;
-  // when the shape wants more cells than the code has letters, letters split into copies
-  const base = S.parts.length;
-  for (let i = 0; S.parts.length < S.N; i++) { const src = S.parts[Math.floor(rnd(i + 101) * base)]; S.parts.push({ ...src }); }
-  S.shape = layoutShape(S.def, S.N);
-  decorate(S.shape, S.def, clean(p.m) || '메리크리스마스');
-  const T = S.shape;
-  const order = S.parts.map((_, i) => i).sort((a, b) => rnd(a * 3.1 + 5) - rnd(b * 3.1 + 5));
-  order.forEach((pi, k) => {
-    const part = S.parts[pi];
-    if (k < S.N && T.pts[k]) {
-      const t = T.pts[k];
-      part.tj = k;
-      const depth = 1 - (t.y - T.box.top) / T.box.h;
-      part.depth = depth;
-      part.delay = reduce ? depth * 300 : depth * 2300 + rnd(pi + 9) * 380;
-      part.dur = reduce ? 500 : 1100 + rnd(pi + 13) * 620;
-      part.bend = (rnd(pi + 21) - 0.5) * 220;
-      part.lift = 60 + rnd(pi + 29) * 160;
-    } else {
-      part.tj = -1;
-      part.delay = rnd(pi + 9) * 1400;
-    }
-    part.arrived = false;
+  S.lines = buildLines(p, S.def, S.N);
+  layoutCode();
+  S.form = sample3(S.def, S.N);
+  S.pts = S.form.pts.map(q => ({ ...q }));
+  decorate(S.pts, S.def, glyphSeq(p));
+  layoutView();
+  const chars = S.code.chars, code = [];
+  chars.forEach((c, ci) => { if (!c.space) code.push({ code: true, ci, ch: c.ch, col: C[c.kind] }); });
+  const N = S.pts.length;
+  const tOrder = S.pts.map((_, i) => i).sort((a, b) => rnd(a * 3.7 + 2) - rnd(b * 3.7 + 2));
+  const cOrder = code.map((_, i) => i).sort((a, b) => rnd(a * 3.1 + 5) - rnd(b * 3.1 + 5));
+  S.parts = [];
+  S.fall = [];
+  // every code letter flies out; when the shape needs more points than the code has letters,
+  // letters split into copies that peel off the same spot one after another
+  tOrder.forEach((tj, k) => {
+    const t = S.pts[tj], depth = 1 - t.y;
+    const src = code[cOrder[k % code.length]];
+    const part = k < code.length ? src : { code: true, ci: src.ci, ch: src.ch, col: src.col };
+    Object.assign(part, {
+      tj, depth,
+      delay: reduce ? depth * 300 : depth * 2400 + rnd(k + 9) * 500,
+      dur: reduce ? 500 : 1100 + rnd(k + 13) * 700,
+      bend: (rnd(k + 21) - 0.5) * 240, lift: 60 + rnd(k + 29) * 180,
+    });
+    S.parts.push(part);
   });
-  // heart halo, the "heart code" look
+  for (let k = N; k < code.length; k++) {
+    const part = code[cOrder[k]], c = chars[part.ci];
+    S.fall.push({ ch: part.ch, col: part.col, x: c.x, y: c.y, vy: 0, wait: rnd(k + 9) * 1400, ph: rnd(part.ci) * 6.28 });
+  }
+  S.codeCount = Math.min(code.length, N);
   S.halo = S.def.finale === 'beat'
-    ? Array.from({ length: 220 }, (_, i) => ({ k: Math.floor(rnd(i + 301) * T.pts.length), d: 1.03 + rnd(i + 401) * 0.28, j: rnd(i + 501) }))
+    ? Array.from({ length: 260 }, (_, i) => ({ k: Math.floor(rnd(i + 301) * N), d: 1.04 + rnd(i + 401) * 0.3, j: rnd(i + 501) }))
     : [];
-  const total = chars.length;
-  const per = reduce ? 2 : clamp(3800 / total, 8, 36);
+  const per = reduce ? 2 : clamp(3800 / chars.length, 8, 36);
   let t = 0; S.schedule = chars.map(c => { t += c.nl ? per * 4 : per * (0.6 + Math.random() * 0.8); return t; });
   S.typingDone = t;
 }
 function resetLetterUI() {
   ['tapHint', 'endBar', 'skipHint'].forEach(id => $(id).hidden = true);
   $('endBar').classList.remove('show');
-  S.fx = []; S.rockets = []; S.fall = []; S.shown = {}; S.flash = 0; S.litAt = 0; S.autoFx = 0;
+  S.fx = []; S.rockets = []; S.shown = {}; S.flash = 0; S.litAt = 0; S.autoFx = 0;
 }
 async function openLetter(p, preview) {
   S.mode = 'letter'; S.payload = p; S.preview = preview; S.phase = 'idle';
-  S.lines = null; S.shape = null;
+  S.lines = null; S.def = null;
   bgmStop();
   $('compose').hidden = true; $('letter').hidden = false; $('intro').hidden = false;
   $('introTitle').textContent = `${p.t}에게 도착한 코드 한 줄`;
@@ -972,6 +1027,7 @@ function run() {
   $('muteBtn').hidden = false;
   resetLetterUI();
   prepare(S.payload);
+  CAM.th = -0.5; CAM.ph = 0.2; CAM.spin = CAM.auto;
   S.phase = 'typing'; S.tStart = performance.now(); S.typed = 0;
   $('skipHint').hidden = REC.on;
   const b = S.payload.b;
@@ -991,7 +1047,7 @@ function launch(x, y, delay = 0) {
   S.rockets.push({ x0: sx, y0: H + 10, x, y, t: -delay, dur: reduce ? 1 : 420 });
 }
 function burst(x, y) {
-  const chars = seg(clean(S.payload.m)).filter(c => c.trim());
+  const chars = glyphSeq(S.payload).filter(c => c !== '✦' && c !== '·');
   const cols = [C.candle, C.berry, C.ice, C.frost, C.pine];
   const base = cols[Math.floor(Math.random() * cols.length)];
   const n = reduce ? 24 : 70, sc = Math.min(1, W / 420) * 0.6 + 0.4;
@@ -1069,7 +1125,7 @@ function beatPulse(t) {
 function wrapText(text, maxW) {
   const words = text.split(' '), lines = [];
   let line = '';
-  const push = w => {
+  const split = w => {
     if (ctx.measureText(w).width <= maxW) return w;
     let cur = '';
     for (const ch of seg(w)) { if (ctx.measureText(cur + ch).width > maxW && cur) { lines.push(cur); cur = ch; } else cur += ch; }
@@ -1077,8 +1133,8 @@ function wrapText(text, maxW) {
   };
   for (const w of words) {
     const test = line ? line + ' ' + w : w;
-    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = push(w); }
-    else line = ctx.measureText(test).width > maxW ? push(test) : test;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = split(w); }
+    else line = split(test);
   }
   if (line) lines.push(line);
   return lines.slice(0, 5);
@@ -1087,8 +1143,8 @@ function drawCard(now) {
   const el = now - S.litAt - 1000;
   if (el < 0) return;
   const a = clamp(el / 900, 0, 1), dy = (1 - easeOut(a)) * 12;
-  const T = S.shape, p = S.payload;
-  let y = T.box.top + T.box.h + Math.max(16, T.s * 1.3) + dy;
+  const p = S.payload;
+  let y = VIEW.top + VIEW.h * 1.1 + 14 + dy;
   const maxW = Math.min(W - 40, 460);
   const fs = clamp(W * 0.052, 15, 24);
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -1125,6 +1181,7 @@ function frame(now) {
   drawSnow(dt, now);
   if (S.mode === 'letter' && S.lines) drawLetter(now, dt);
   if (REC.on) drawWatermark();
+  if (S.mode === 'compose') drawPreview(now);
   requestAnimationFrame(frame);
 }
 function drawLetter(now, dt) {
@@ -1147,34 +1204,33 @@ function drawLetter(now, dt) {
     return;
   }
 
+  camFrame(dt);
   const runEl = now - S.runAt, promptChars = seg(PROMPT), pStep = reduce ? 5 : 32;
   const pShown = Math.min(promptChars.length, Math.floor(runEl / pStep));
   const pAlpha = S.phase === 'run' ? 1 : clamp(1 - (now - S.flyAt) / 500, 0, 1);
   if (pAlpha > 0) {
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     ctx.font = codeFont(code.sz);
     ctx.fillStyle = rgb(C.candle, pAlpha);
     ctx.fillText(promptChars.slice(0, pShown).join(''), code.x0, code.promptY);
   }
 
   if (S.phase === 'run') {
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     ctx.font = codeFont(code.sz);
     for (const c of chars) if (!c.space) { ctx.fillStyle = rgb(C[c.kind]); ctx.fillText(c.ch, c.x, c.y); }
-    if (runEl > promptChars.length * pStep + 320) {
+    if (runEl > promptChars.length * pStep + 420) {
       S.phase = 'fly'; S.flyAt = now; S.flash = 1;
       bell(SCALE[0], 0, 0.3, 2.2); bell(SCALE[3], 0.02, 0.18, 2.2);
-      S.flyEnd = Math.max(...S.parts.filter(p => p.tj >= 0).map(p => p.delay + p.dur));
-      S.fall = S.parts.filter(p => p.tj < 0).map(p => {
-        const c = chars[p.ci];
-        return { ch: p.ch, col: p.col, x: c.x, y: c.y, vy: 0, wait: p.delay, ph: rnd(p.ci) * 6.28 };
-      });
+      S.flyEnd = Math.max(...S.parts.map(p => p.delay + p.dur));
     }
     return;
   }
 
-  const T = S.shape, fl = now - S.flyAt, def = S.def;
-  const treeFont = `700 ${Math.max(6, Math.round(T.s * 0.94))}px "Gowun Batang", serif`;
+  const fl = now - S.flyAt, def = S.def, pts = S.pts;
 
   if (S.fall.length) {
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     ctx.font = codeFont(code.sz);
     for (let i = S.fall.length - 1; i >= 0; i--) {
       const f = S.fall[i];
@@ -1189,77 +1245,89 @@ function drawLetter(now, dt) {
   }
 
   const lit = S.phase === 'lit', litEl = lit ? now - S.litAt : 0;
-  const cx = T.box.cx, cy = T.box.top + T.box.h * 0.5;
-  let scale = 1, pulse = 0;
+  let k3 = 1, pulse = 0;
   if (lit && !reduce) {
-    if (def.finale === 'beat') { pulse = beatPulse(litEl); scale = 1 + 0.06 * pulse; }
-    else if (def.finale === 'breathe') scale = 1 + 0.018 * Math.sin(litEl * 0.002);
+    if (def.finale === 'beat') { pulse = beatPulse(litEl); k3 = 1 + 0.06 * pulse; }
+    else if (def.finale === 'breathe') k3 = 1 + 0.015 * Math.sin(litEl * 0.002);
   }
-  const tx = x => cx + (x - cx) * scale, ty = y => cy + (y - cy) * scale;
-  const lightOn = t => clamp((litEl - (t.y - T.box.top) / T.box.h * 900) / 300, 0, 1);
+  const lightOn = t => clamp((litEl - t.y * 900) / 300, 0, 1);
 
-  if (lit && S.halo.length) {
-    ctx.globalCompositeOperation = 'lighter';
-    for (const h of S.halo) {
-      const t = T.pts[h.k]; if (!t) continue;
-      const d = h.d + 0.22 * pulse * (0.5 + h.j);
-      const x = cx + (t.x - cx) * d + Math.sin(now * 0.003 + h.j * 20) * 2;
-      const y = cy + (t.y - cy) * d + Math.cos(now * 0.003 + h.j * 20) * 2;
-      ctx.fillStyle = rgb(REG.heart, 0.25 + 0.35 * h.j * clamp(litEl / 600, 0, 1));
-      ctx.fillRect(x, y, 1.6, 1.6);
-    }
-    ctx.globalCompositeOperation = 'source-over';
-  }
 
-  if (lit) {
-    ctx.globalCompositeOperation = 'lighter';
-    for (const t of T.pts) {
-      if (!t.orn) continue;
-      const on = lightOn(t);
-      if (!on) continue;
-      const tw = 0.55 + 0.45 * Math.sin(now * 0.003 + t.ph);
-      const r = T.s * (1.3 + tw * 0.7);
-      ctx.globalAlpha = on * (0.45 + tw * 0.55);
-      ctx.drawImage(t.orn.img, tx(t.x) - r, ty(t.y) - r, r * 2, r * 2);
-    }
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-  }
-
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // build the frame's drawables and sort far to near
+  const items = S.items; items.length = 0;
   let arrivedAll = true;
-  const chimeVol = hasBgm() ? 0.06 : 0.16, chimeGap = hasBgm() ? 160 : 85;
+  const chimeVol = hasBgm() ? 0.06 : 0.14, chimeGap = hasBgm() ? 160 : 85;
   for (const p of S.parts) {
-    if (p.tj < 0) continue;
-    const t = T.pts[p.tj], c = chars[p.ci];
+    const t = pts[p.tj];
     const e = clamp((fl - p.delay) / p.dur, 0, 1);
     if (e < 1) arrivedAll = false;
     const k = easeInOut(e);
+    const T = proj(t.x, t.y, t.z, k3);
+    const c = chars[p.ci];
     const sx = c.x + c.w / 2, sy = c.y - code.sz * 0.35;
-    const ex = tx(t.x), ey = ty(t.y);
-    const mx = (sx + ex) / 2 + p.bend, my = Math.min(sy, ey) - p.lift;
-    const x = (1 - k) * (1 - k) * sx + 2 * (1 - k) * k * mx + k * k * ex;
-    const y = (1 - k) * (1 - k) * sy + 2 * (1 - k) * k * my + k * k * ey;
+    const mx = (sx + T[0]) / 2 + p.bend, my = Math.min(sy, T[1]) - p.lift;
+    const x = (1 - k) * (1 - k) * sx + 2 * (1 - k) * k * mx + k * k * T[0];
+    const y = (1 - k) * (1 - k) * sy + 2 * (1 - k) * k * my + k * k * T[1];
+    const z = lerp(1.5, T[2], k), f = lerp(1, T[3], k);
     if (e >= 1 && !p.arrived) {
       p.arrived = true;
       if (now - A.lastChime > chimeGap) { A.lastChime = now; bell(SCALE[Math.floor(clamp(p.depth, 0, 0.999) * SCALE.length)], 0, chimeVol, 1.3); }
     }
+    items.push({ p, t, e, k, x, y, z, f });
+  }
+  items.sort((a, b) => a.z - b.z);
+
+  // pass 1: additive lights
+  ctx.globalCompositeOperation = 'lighter';
+  for (const it of items) {
+    const { p, t, e, x, y, z, f } = it;
+    const dn = clamp((z + 0.55) / 1.1, 0, 1);
+    if (e < 0.8) continue;
+    let a = 0.05 + 0.13 * dn, img = spriteFor(t.col), r = S.spx * f * 0.85;
+    if (lit && t.orn) {
+      const tw = 0.55 + 0.45 * Math.sin(now * 0.003 + t.ph), on = lightOn(t);
+      a = Math.max(a, on * (0.45 + tw * 0.55) * (0.4 + 0.6 * dn)); img = t.orn.img; r = S.spx * f * (1.4 + tw * 0.8);
+    }
+    ctx.globalAlpha = a;
+    ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
+  }
+  ctx.globalAlpha = 1;
+
+  if (lit && S.halo.length) {
+    for (const h of S.halo) {
+      const t = pts[h.k]; if (!t) continue;
+      const d = h.d + 0.25 * pulse * (0.5 + h.j);
+      const q = proj(t.x * d, 0.5 + (t.y - 0.5) * d, t.z * d, k3);
+      ctx.fillStyle = rgb(REG.heart, (0.25 + 0.4 * h.j) * clamp(litEl / 600, 0, 1) * (0.4 + 0.6 * clamp((q[2] + 0.6) / 1.2, 0, 1)));
+      ctx.fillRect(q[0], q[1], 1.6 * q[3], 1.6 * q[3]);
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  // pass 2: letters, far to near
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  let curFont = '';
+  for (const it of items) {
+    const { p, t, e, k, x, y, z, f } = it;
+    const dn = clamp((z + 0.55) / 1.1, 0, 1);
+    let font, col, glyph;
     if (e < 0.8) {
-      ctx.font = codeFont(lerp(code.sz, T.s * 0.94, k));
-      ctx.fillStyle = rgb(p.col);
-      ctx.fillText(p.ch, x, y);
+      font = codeFont(Math.round(lerp(code.sz, S.spx * f, k) * 2) / 2);
+      col = p.col; glyph = p.ch;
     } else {
-      const m = (e - 0.8) / 0.2;
-      let col = mix(p.col, t.col, m);
+      col = mix(p.col, t.col, (e - 0.8) / 0.2);
       if (lit) {
         const on = lightOn(t);
         if (t.orn) col = mix(col, mix(t.orn.c, [255, 255, 255], 0.25), on);
-        else col = mix(col, mix(t.col, [255, 255, 255], 0.3), on * (0.5 + 0.5 * Math.sin(now * 0.0018 - t.y * 0.03 + t.x * 0.01)) * 0.55);
+        else col = mix(col, mix(t.col, [255, 255, 255], 0.3), on * (0.5 + 0.5 * Math.sin(now * 0.0018 - t.y * 6 + t.x * 3)) * 0.55);
       }
-      ctx.font = treeFont;
-      ctx.fillStyle = rgb(col);
-      ctx.fillText(t.glyph, x, y);
+      col = mix(mix(C.night, col, 0.22), col, dn * dn);
+      font = `700 ${Math.max(5, Math.round(S.spx * f * 0.82 * 2) / 2)}px "Gowun Batang", serif`;
+      glyph = t.glyph;
     }
+    if (font !== curFont) { ctx.font = font; curFont = font; }
+    ctx.fillStyle = rgb(col);
+    ctx.fillText(glyph, x, y);
   }
 
   if (S.phase === 'fly' && arrivedAll && fl > S.flyEnd) {
@@ -1272,8 +1340,9 @@ function drawLetter(now, dt) {
   if (lit) {
     if (def.finale === 'star') {
       const a = easeOutBack(clamp(litEl / 650, 0, 1));
-      const R = Math.max(9, T.s * 1.25) * (1 + 0.05 * Math.sin(now * 0.004));
-      drawStar(cx, ty(T.box.top + T.s * 0.1), R * a, clamp(litEl / 300, 0, 1), now);
+      const q = proj(0, -0.02, 0, k3);
+      const R = Math.max(9, S.spx * 1.6) * q[3] * (1 + 0.05 * Math.sin(now * 0.004));
+      drawStar(q[0], q[1], R * a, clamp(litEl / 300, 0, 1), now);
     }
     drawCard(now);
     if (REC.on) {
@@ -1282,7 +1351,7 @@ function drawLetter(now, dt) {
         launch(W * (0.2 + Math.random() * 0.6), H * (0.12 + Math.random() * 0.15));
         S.autoFx++;
       }
-      if (litEl > 6800) stopRecording();
+      if (litEl > 7500) stopRecording();
     } else if (litEl > 2600 && !S.shown.end) {
       S.shown.end = 1; show('tapHint'); show('endBar');
     }
@@ -1389,20 +1458,41 @@ async function saveVideo() {
 function flashMsg(t) { $('tapHint').textContent = t; show('tapHint'); }
 
 /* =========================================================
-   Input
+   Input: drag to turn the formation, tap for fireworks
    ========================================================= */
+let ptr = null;
 cv.addEventListener('pointerdown', e => {
   if (S.mode !== 'letter') return;
-  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-  const now = performance.now();
-  if (S.phase === 'typing') return skipTyping(now);
-  if (S.phase === 'lit') launch(x, Math.min(y, H * 0.75));
+  ptr = { id: e.pointerId, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, lt: performance.now(), moved: false };
+  try { cv.setPointerCapture(e.pointerId); } catch { /* ignore */ }
 });
+cv.addEventListener('pointermove', e => {
+  if (!ptr || e.pointerId !== ptr.id) return;
+  if (!ptr.moved && Math.hypot(e.clientX - ptr.x0, e.clientY - ptr.y0) > 7) ptr.moved = true;
+  if (!ptr.moved || (S.phase !== 'fly' && S.phase !== 'lit')) return;
+  const now = performance.now(), dx = e.clientX - ptr.lx, dy = e.clientY - ptr.ly, dtm = Math.max(8, now - ptr.lt);
+  CAM.drag = true;
+  CAM.th += dx * 0.008;
+  CAM.ph = clamp(CAM.ph + dy * 0.004, -0.2, 0.7);
+  CAM.spin = clamp(dx * 0.008 / dtm, -0.006, 0.006);
+  ptr.lx = e.clientX; ptr.ly = e.clientY; ptr.lt = now;
+});
+function endPtr(e) {
+  if (!ptr || e.pointerId !== ptr.id) return;
+  const p = ptr; ptr = null; CAM.drag = false;
+  if (p.moved || S.mode !== 'letter') return;
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (S.phase === 'typing') skipTyping(performance.now());
+  else if (S.phase === 'lit') launch(x, Math.min(y, H * 0.75));
+}
+cv.addEventListener('pointerup', endPtr);
+cv.addEventListener('pointercancel', e => { if (ptr && e.pointerId === ptr.id) { ptr = null; CAM.drag = false; } });
 $('runBtn').addEventListener('click', run);
 document.addEventListener('keydown', e => {
   if (!$('saveSheet').hidden && e.key === 'Escape') { $('saveSheet').hidden = true; return; }
   if (S.mode === 'letter' && !$('intro').hidden && e.key === 'Enter' && !$('runBtn').disabled) { e.preventDefault(); run(); }
   else if (S.mode === 'letter' && S.phase === 'typing' && (e.key === ' ' || e.key === 'Enter')) skipTyping(performance.now());
+  else if (S.mode === 'letter' && (S.phase === 'lit' || S.phase === 'fly') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) CAM.spin = (e.key === 'ArrowLeft' ? -1 : 1) * 0.003;
 });
 $('muteBtn').addEventListener('click', () => {
   A.muted = !A.muted;
@@ -1410,7 +1500,7 @@ $('muteBtn').addEventListener('click', () => {
   if (A.master) A.master.gain.value = A.muted ? 0 : 0.32;
 });
 $('replayBtn').addEventListener('click', run);
-$('recBtn').addEventListener('click', () => { $('tapHint').textContent = '하늘을 누르면 불꽃이 터져요'; startRecording(); });
+$('recBtn').addEventListener('click', () => { $('tapHint').textContent = '드래그하면 돌아가고, 누르면 불꽃이 터져요'; startRecording(); });
 $('recCancel').addEventListener('click', () => { REC.cancelled = true; stopRecording(); });
 $('saveBtn').addEventListener('click', saveVideo);
 $('saveClose').addEventListener('click', () => { $('saveSheet').hidden = true; });
@@ -1426,52 +1516,71 @@ $('replyBtn').addEventListener('click', () => {
    Compose
    ========================================================= */
 const fTo = $('fTo'), fFrom = $('fFrom'), fMsg = $('fMsg');
-const F = { shape: 'tree', emoji: '🦌', image: null, raster: null, sens: 48, music: 'jingle' };
+const F = { shape: 'tree', image: null, raster: null, sens: 48, music: 'jingle' };
 function counters() {
   $('cTo').textContent = `${seg(fTo.value).length}/10`;
   $('cFrom').textContent = `${seg(fFrom.value).length}/10`;
   $('cMsg').textContent = `${seg(fMsg.value).length}/60`;
 }
 function dirty() { $('result').hidden = true; $('formErr').hidden = true; }
-[fTo, fFrom, fMsg].forEach(el => el.addEventListener('input', () => { counters(); dirty(); drawPreview(); }));
+[fTo, fFrom, fMsg].forEach(el => el.addEventListener('input', () => { counters(); dirty(); }));
 
 function currentShapeSpec() {
   if (F.shape === 'emoji') { const e = seg(($('fEmoji').value || '').trim())[0]; return e ? { e } : null; }
   if (F.shape === 'image') return F.image ? { i: { w: F.image.w, h: F.image.h, d: b64(F.image.cells) } } : null;
   return F.shape;
 }
+// rotating 3D preview of the chosen formation
 const pv = $('shapePrev'), pctx = pv.getContext('2d');
-function drawPreview() {
+const PV = { spec: undefined, def: null, form: null };
+function previewSpec() {
+  const spec = currentShapeSpec(), key = JSON.stringify(spec);
+  if (key === PV.spec) return;
+  PV.spec = key;
+  PV.def = spec ? resolveShape(spec) : null;
+  if (PV.def && F.shape === 'emoji' && !emojiShape(spec.e)) PV.def = null;
+  PV.form = PV.def ? sample3(PV.def, 420) : null;
+  $('prevInfo').textContent = PV.def ? `${PV.def.label} · 글자 ${PV.def.N}개 · 드래그로 돌려 보기` : '미리보기';
+}
+let pvDrag = null, pvTh = -0.5, pvPh = 0.25;
+pv.addEventListener('pointerdown', e => { pvDrag = { x: e.clientX, y: e.clientY }; try { pv.setPointerCapture(e.pointerId); } catch { /* ignore */ } });
+pv.addEventListener('pointermove', e => { if (!pvDrag) return; pvTh += (e.clientX - pvDrag.x) * 0.012; pvPh = clamp(pvPh + (e.clientY - pvDrag.y) * 0.006, -0.3, 0.8); pvDrag = { x: e.clientX, y: e.clientY }; });
+pv.addEventListener('pointerup', () => { pvDrag = null; });
+let pvLast = 0;
+function drawPreview(now) {
+  const dt = Math.min(50, now - (pvLast || now)); pvLast = now;
+  previewSpec();
   pctx.setTransform(2, 0, 0, 2, 0, 0);
   pctx.fillStyle = rgb(C.night); pctx.fillRect(0, 0, 150, 150);
-  const spec = currentShapeSpec();
-  if (!spec) {
+  if (!PV.form) {
     pctx.fillStyle = rgb(C.mute); pctx.font = '12px "IBM Plex Sans KR", sans-serif'; pctx.textAlign = 'center';
     pctx.fillText(F.shape === 'image' ? '사진을 골라 주세요' : '이모지를 넣어 주세요', 75, 78);
-    $('prevInfo').textContent = '미리보기';
     return;
   }
-  const def = resolveShape(spec);
-  const h = Math.min(128, 128 / def.aspect), box = { cx: 75, top: (150 - h) / 2, h, w: h * def.aspect };
-  const { s, pts } = shapePoints(def, box, Math.min(def.N, 320));
-  const chars = seg(fMsg.value.replace(/\s/g, '')) ;
-  pctx.textAlign = 'center'; pctx.textBaseline = 'middle';
-  pctx.font = `700 ${Math.max(4, s * 0.95)}px "Gowun Batang", serif`;
-  pts.forEach((p, i) => {
-    pctx.fillStyle = rgb(p.r === 'trunk' ? REG.trunk : colorFor(p.r, (p.y - box.top) / box.h, i));
-    if (s >= 6 && chars.length) pctx.fillText(chars[i % chars.length], p.x, p.y);
-    else { pctx.beginPath(); pctx.arc(p.x, p.y, Math.max(1, s * 0.38), 0, 6.283); pctx.fill(); }
-  });
-  $('prevInfo').textContent = `${def.label} · 글자 ${def.N}개`;
+  if (!pvDrag && !reduce) pvTh += dt * 0.0006;
+  const c = Math.cos(pvTh), s = Math.sin(pvTh), cp = Math.cos(pvPh), sp = Math.sin(pvPh);
+  const sc = 112 / Math.max(1, 2 * PV.form.rMax * 0.95, 1.05), D = 2.6;
+  const arr = PV.form.pts.map((p, i) => {
+    const X = p.x, Y = p.y - 0.5, Z = p.z;
+    const x1 = X * c + Z * s, z1 = -X * s + Z * c, y2 = Y * cp + z1 * sp, z2 = -Y * sp + z1 * cp, f = D / (D - z2);
+    return { x: 75 + x1 * sc * f, y: 75 + y2 * sc * f, z: z2, f, col: p.r === 'trunk' ? REG.trunk : colorFor(p.r, p.y, i) };
+  }).sort((a, b) => a.z - b.z);
+  pctx.globalCompositeOperation = 'lighter';
+  for (const q of arr) {
+    const dn = clamp((q.z + 0.55) / 1.1, 0, 1);
+    pctx.fillStyle = rgb(q.col, 0.25 + 0.75 * dn);
+    pctx.beginPath(); pctx.arc(q.x, q.y, 1.1 * q.f, 0, 6.283); pctx.fill();
+  }
+  pctx.globalCompositeOperation = 'source-over';
 }
 function setShape(v) {
   F.shape = v;
   $('emojiSub').hidden = v !== 'emoji';
   $('imageSub').hidden = v !== 'image';
-  dirty(); drawPreview();
+  dirty();
 }
 document.querySelectorAll('input[name=shape]').forEach(r => r.addEventListener('change', () => setShape(r.value)));
-$('fEmoji').addEventListener('input', () => { dirty(); drawPreview(); });
+$('fEmoji').addEventListener('input', dirty);
 function processImage() {
   if (!F.raster) return;
   F.image = toCells(F.raster, F.sens);
@@ -1479,7 +1588,7 @@ function processImage() {
   $('imgInfo').textContent = F.image.useAlpha
     ? `투명 배경을 인식했어요. 윤곽만 남겼어요. (${F.image.w}×${F.image.h})`
     : `가장자리 색을 배경으로 보고 지웠어요. 그림이 ${pct}%를 차지해요. 너무 많이 지워지면 강도를 낮춰 보세요.`;
-  dirty(); drawPreview();
+  dirty();
 }
 $('fImage').addEventListener('change', async e => {
   const file = e.target.files && e.target.files[0];
@@ -1497,7 +1606,7 @@ $('fSens').addEventListener('input', e => { F.sens = +e.target.value; $('sensVal
 function setMusic(v) {
   F.music = v;
   $('ytSub').hidden = v !== 'yt';
-  $('musicNote').textContent = v === 'yt' ? '유튜브 주소를 붙여 넣어 주세요.' : v === 'none' ? '글자가 도착할 때 종소리만 나요.' : '오르골 소리로 연주돼요. 고르면 몇 초간 들려드려요.';
+  $('musicNote').textContent = v === 'yt' ? '유튜브 주소를 붙여 넣어 주세요.' : v === 'none' ? '글자가 자리를 잡을 때 종소리만 나요.' : '오르골 소리로 연주돼요. 고르면 몇 초간 들려드려요.';
   dirty();
   bgmStop();
   if (MEL[v]) { audioInit(); bgmStart(v, 6); }
@@ -1549,12 +1658,12 @@ $('copyBtn').addEventListener('click', () => {
 });
 function openCompose(prefill) {
   if (REC.on) { REC.cancelled = true; stopRecording(); }
-  S.mode = 'compose'; S.phase = 'idle'; S.lines = null; S.shape = null;
+  S.mode = 'compose'; S.phase = 'idle'; S.lines = null; S.def = null;
   bgmStop(); ytStop();
   resetLetterUI();
   $('letter').hidden = true; $('muteBtn').hidden = true; $('compose').hidden = false; $('saveSheet').hidden = true;
   if (prefill) { fTo.value = prefill.t; fFrom.value = prefill.f; fMsg.value = prefill.m; $('result').hidden = true; }
-  counters(); drawPreview();
+  counters();
   window.scrollTo(0, 0);
 }
 
@@ -1570,7 +1679,6 @@ window.addEventListener('resize', resize);
 resize();
 counters();
 route();
-document.fonts && document.fonts.ready.then(drawPreview);
 requestAnimationFrame(frame);
 })();
 </script>
