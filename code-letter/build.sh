@@ -18,4 +18,6 @@ mkdir -p docs
   cat code-letter/index.html
   printf '\n</body>\n</html>\n'
 } > docs/index.html
-echo "built docs/index.html for $SITE_URL"
+cp docs/index.html index.html
+cp docs/og.png og.png 2>/dev/null || true
+echo "built docs/index.html and index.html for $SITE_URL"
