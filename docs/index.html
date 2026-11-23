@@ -355,8 +355,9 @@ body.recording #dock, body.recording #muteBtn, body.recording #skipHint { displa
 <script>
 (() => {
 'use strict';
-// Public URL of the page when it runs inside an embedding frame (claude.ai artifact).
-const SHARE_BASE = 'https://claude.ai/artifact/DNzj9hegQB9oZJTEhwXfKZ';
+// Public address of the standalone page (GitHub Pages). Links made anywhere point here,
+// so the person receiving one needs no account to open it.
+const SHARE_BASE = 'https://yuminkyeong.github.io/Claude/';
 
 const $ = id => document.getElementById(id);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -677,7 +678,7 @@ async function readLink() {
     return sanitize(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(fromB62(old[1]))));
   } catch { return 'bad'; }
 }
-const shareBase = () => (SHARE_BASE && inFrame) ? SHARE_BASE : location.href.split('#')[0];
+const shareBase = () => (inFrame || location.protocol === 'file:') ? SHARE_BASE : location.href.split('#')[0];
 
 /* =========================================================
    Audio: music-box bells, melodies, recording tap
