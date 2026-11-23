@@ -1,0 +1,1816 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta property="og:type" content="website">
+<meta property="og:title" content="코드 편지가 도착했어요">
+<meta property="og:description" content="열어서 실행하면 코드 한 줄이 그림이 돼요.">
+<meta property="og:image" content="https://yuminkyeong.github.io/Claude/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<title>코드 편지</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="코드 한 줄이 입체 트리가, 하트가, 내 사진이 되는 편지">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one night canvas behind everything; the compose form scrolls over it, the letter plays on it with a bottom dock. */
+:root {
+  --night: #0c1322;
+  --night-2: #141e35;
+  --line: #2a3654;
+  --frost: #e3eaf6;
+  --mute: #8f9bb6;
+  --candle: #f2c46b;
+  --candle-ink: #2a1d05;
+  --pine: #5fb98c;
+  --berry: #ef6f6c;
+  --font-display: "Gowun Batang", "Nanum Myeongjo", serif;
+  --font-ui: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-code: "JetBrains Mono", "IBM Plex Sans KR", ui-monospace, monospace;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--night);
+  color: var(--frost);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-tap-highlight-color: transparent;
+}
+#stage { position: fixed; left: 0; top: 0; display: block; z-index: 0; touch-action: manipulation; }
+body.recording #stage { border-radius: 10px; box-shadow: 0 0 0 1px var(--line), 0 20px 60px rgba(0,0,0,.5); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- compose ---------- */
+#compose {
+  position: relative; z-index: 1;
+  min-height: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 44px 64px;
+}
+.wrap { max-width: 36rem; margin: 0 auto; display: grid; gap: 26px; }
+.eyebrow { font-family: var(--font-code); font-size: 12px; letter-spacing: 0.14em; color: var(--candle); text-transform: uppercase; margin: 0; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(2.4rem, 9vw, 3.4rem); line-height: 1.1; margin: 6px 0 10px; text-wrap: balance; }
+.lead { color: var(--mute); margin: 0; max-width: 32rem; }
+.lead code { font-family: var(--font-code); color: var(--frost); font-size: 0.92em; }
+
+form.card {
+  background: color-mix(in srgb, var(--night-2) 90%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  display: grid; gap: 22px;
+  backdrop-filter: blur(6px);
+}
+fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+legend { font-family: var(--font-code); font-size: 12px; color: var(--candle); letter-spacing: .08em; padding: 0; margin-bottom: 10px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 440px) { .row { grid-template-columns: 1fr; } }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field label, .lbl { font-size: 13px; color: var(--mute); display: flex; justify-content: space-between; gap: 8px; }
+.field label span { font-family: var(--font-code); font-size: 11px; font-variant-numeric: tabular-nums; }
+input[type=text], input[type=url], textarea {
+  width: 100%; box-sizing: border-box;
+  background: var(--night); color: var(--frost);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; font: inherit; font-size: 16px;
+}
+textarea { resize: vertical; min-height: 84px; font-family: var(--font-display); font-size: 17px; line-height: 1.5; }
+input:focus-visible, textarea:focus-visible { outline: 2px solid var(--candle); outline-offset: 1px; border-color: transparent; }
+.note { font-size: 12px; color: var(--mute); margin: 0; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.chip span {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px;
+  font-size: 14px; color: var(--frost); background: var(--night);
+}
+.chip span i { font-style: normal; font-family: var(--font-display); color: var(--candle); }
+.chip input:checked + span { border-color: var(--candle); background: color-mix(in srgb, var(--candle) 16%, var(--night)); }
+.chip input:focus-visible + span { outline: 2px solid var(--frost); outline-offset: 2px; }
+
+.shape-grid { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 16px; align-items: start; }
+@media (max-width: 440px) { .shape-grid { grid-template-columns: 1fr; } .prev { justify-self: center; } }
+.prev { display: grid; gap: 6px; justify-items: center; }
+#shapePrev { width: 150px; height: 150px; border-radius: 10px; background: var(--night); border: 1px solid var(--line); }
+.prev small { font-size: 11px; color: var(--mute); font-family: var(--font-code); }
+.sub { display: grid; gap: 8px; padding-top: 4px; }
+.file-btn { display: inline-flex; align-items: center; gap: 8px; border: 1px dashed var(--mute); border-radius: 10px; padding: 12px 14px; font-size: 14px; cursor: pointer; color: var(--frost); }
+.file-btn:hover { border-color: var(--candle); }
+.file-btn input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.file-btn:focus-within { outline: 2px solid var(--frost); outline-offset: 2px; }
+input[type=range] { width: 100%; accent-color: var(--candle); }
+.emoji-in { font-size: 28px !important; width: 5.5rem !important; text-align: center; padding: 4px 8px !important; }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+button { font: inherit; cursor: pointer; border-radius: 999px; padding: 11px 20px; font-weight: 600; font-size: 15px; border: 1px solid transparent; }
+button:focus-visible { outline: 2px solid var(--frost); outline-offset: 2px; }
+button:disabled { opacity: .5; cursor: default; }
+.btn-primary { background: var(--candle); color: var(--candle-ink); }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
+.btn-ghost { background: transparent; color: var(--frost); border-color: var(--line); }
+.btn-ghost:hover { border-color: var(--mute); }
+.err { color: var(--berry); font-size: 13px; margin: 0; }
+.ok { color: var(--pine); font-size: 12px; margin: 0; }
+
+.result { display: grid; gap: 10px; border-top: 1px dashed var(--line); padding-top: 16px; }
+.result p { margin: 0; font-size: 13px; color: var(--mute); }
+.linkbox { display: flex; gap: 8px; }
+.linkbox input { flex: 1; min-width: 0; font-family: var(--font-code); font-size: 12px; padding: 9px 11px; }
+.linkbox button { padding: 9px 16px; font-size: 14px; }
+.foot { font-size: 12px; color: var(--mute); margin: 0; }
+
+/* ---------- letter ---------- */
+#letter { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+#letter > * { pointer-events: auto; }
+#intro {
+  position: absolute; inset: 0;
+  display: grid; place-content: center; text-align: center; gap: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-bottom: 120px;
+  background: radial-gradient(ellipse at 50% 55%, transparent 0%, color-mix(in srgb, var(--night) 70%, transparent) 70%);
+}
+#intro h2 { font-family: var(--font-display); font-size: clamp(1.7rem, 7vw, 2.6rem); line-height: 1.25; margin: 0; text-wrap: balance; }
+#intro .from { font-family: var(--font-code); color: var(--mute); margin: 0; font-size: 14px; }
+#runBtn { justify-self: center; margin-top: 10px; font-family: var(--font-code); font-size: 16px; padding: 13px 26px; display: inline-flex; gap: 10px; align-items: center; }
+#runBtn kbd { font-family: inherit; font-size: 11px; opacity: .7; border: 1px solid currentColor; border-radius: 4px; padding: 1px 5px; }
+#intro .hint { color: var(--mute); font-size: 12px; margin: 0; }
+
+#ytBox { position: absolute; z-index: 3; display: grid; gap: 6px; transition: all .5s ease; }
+#ytBox .yt-slot { aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: var(--night-2); border: 1px solid var(--line); }
+#ytBox .yt-slot iframe, #ytBox .yt-slot > div { width: 100%; height: 100%; display: block; border: 0; }
+#ytBox p { margin: 0; font-size: 12px; color: var(--mute); font-family: var(--font-code); }
+#ytBox.big { left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: min(260px, calc(100% - 32px)); text-align: center; }
+#ytBox.mini { left: max(12px, env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); width: 128px; opacity: .88; }
+#ytBox.mini p { display: none; }
+body.recording #ytBox { display: none; }
+
+#dock {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: grid; gap: 10px; justify-items: center;
+  pointer-events: none;
+}
+#dock > * { pointer-events: auto; }
+.show { animation: rise .8s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+#endBar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+#endBar button { padding: 9px 15px; font-size: 14px; }
+#endBar .btn-ghost { background: color-mix(in srgb, var(--night) 75%, transparent); }
+#tapHint { font-size: 12px; color: var(--mute); margin: 0; }
+.corner-btn {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  padding: 7px 12px; font-size: 12px; font-family: var(--font-code); font-weight: 400;
+  background: color-mix(in srgb, var(--night) 60%, transparent); color: var(--mute); border-color: var(--line);
+}
+#skipHint {
+  position: absolute; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 0; right: 0; text-align: center;
+  font-family: var(--font-code); font-size: 12px; color: var(--mute); margin: 0; pointer-events: none;
+}
+body.recording #dock, body.recording #muteBtn, body.recording #skipHint { display: none; }
+
+#recBar {
+  position: fixed; z-index: 5; left: 0; right: 0; top: calc(10px + env(safe-area-inset-top, 0px));
+  display: flex; justify-content: center; align-items: center; gap: 12px;
+  font-family: var(--font-code); font-size: 12px; color: var(--frost);
+}
+#recBar .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--berry); animation: blink 1s steps(2) infinite; }
+#recBar button { padding: 5px 12px; font-size: 12px; font-weight: 400; }
+@keyframes blink { 50% { opacity: .2; } }
+
+#saveSheet {
+  position: fixed; inset: 0; z-index: 6;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--night) 82%, transparent);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px;
+}
+.sheet { background: var(--night-2); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; width: min(340px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box; }
+.sheet h3 { margin: 0; font-family: var(--font-display); font-size: 1.3rem; }
+.sheet video { width: 100%; max-height: 52vh; border-radius: 8px; background: #000; object-fit: contain; }
+.sheet .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.sheet .btns button { flex: 1; }
+.sheet p { margin: 0; font-size: 12px; color: var(--mute); }
+
+@media (max-height: 520px) { #intro { padding-bottom: 0; } }
+@media (prefers-reduced-motion: reduce) { .show { animation: none; } #ytBox { transition: none; } }
+</style>
+
+<canvas id="stage" aria-hidden="true"></canvas>
+
+<main id="compose">
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Code Letter · 2026.12.25</p>
+      <h1>코드 편지</h1>
+      <p class="lead">이름과 한마디를 적으면 그 말이 <code>const msg</code>가 되어 실행되고, 글자들이 날아가 입체 트리나 하트, 내가 고른 사진 모양으로 모여 빙글빙글 도는 링크가 만들어져요.</p>
+    </header>
+
+    <form class="card" id="form" novalidate>
+      <fieldset>
+        <legend>01 · 누구에게</legend>
+        <div class="row">
+          <div class="field">
+            <label for="fTo">받는 사람 <span id="cTo">0/10</span></label>
+            <input type="text" id="fTo" maxlength="10" autocomplete="off" value="지수">
+          </div>
+          <div class="field">
+            <label for="fFrom">보내는 사람 <span id="cFrom">0/10</span></label>
+            <input type="text" id="fFrom" maxlength="10" autocomplete="off" value="하늘">
+          </div>
+        </div>
+        <div class="field">
+          <label for="fMsg">하고 싶은 말 <span id="cMsg">0/60</span></label>
+          <textarea id="fMsg" maxlength="60" rows="3">올해도 곁에 있어줘서 고마워. 내년에도 잘 부탁해!</textarea>
+          <p class="note">모양은 이 문장의 글자들로 채워져요. 입력된 내용은 예시예요.</p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>02 · 어떤 모양으로</legend>
+        <div class="shape-grid">
+          <div class="sub">
+            <div class="chips" id="shapeChips" role="radiogroup" aria-label="모양">
+              <label class="chip"><input type="radio" name="shape" value="tree" checked><span><i>▲</i>트리</span></label>
+              <label class="chip"><input type="radio" name="shape" value="heart"><span><i>♥</i>하트</span></label>
+              <label class="chip"><input type="radio" name="shape" value="star"><span><i>★</i>별</span></label>
+              <label class="chip"><input type="radio" name="shape" value="snowman"><span><i>●</i>눈사람</span></label>
+              <label class="chip"><input type="radio" name="shape" value="cake"><span><i>▤</i>케이크</span></label>
+              <label class="chip"><input type="radio" name="shape" value="gift"><span><i>■</i>선물</span></label>
+              <label class="chip"><input type="radio" name="shape" value="emoji"><span><i>☺</i>이모지</span></label>
+              <label class="chip"><input type="radio" name="shape" value="image"><span><i>▣</i>내 사진</span></label>
+            </div>
+            <div class="sub" id="emojiSub" hidden>
+              <label class="lbl" for="fEmoji">이모지 하나를 넣으면 그 모양과 색으로 바뀌어요</label>
+              <input type="text" id="fEmoji" class="emoji-in" value="🦌" maxlength="16" autocomplete="off">
+            </div>
+            <div class="sub" id="imageSub" hidden>
+              <label class="file-btn"><input type="file" id="fImage" accept="image/*">사진이나 그림 고르기</label>
+              <p class="note" id="imgInfo">배경을 자동으로 지우고 윤곽과 색만 남겨요. 캐릭터, 로고, 배경이 단순한 사진이 잘 나와요.</p>
+              <div class="field">
+                <label for="fSens">배경 지우기 강도 <span id="sensVal">48</span></label>
+                <input type="range" id="fSens" min="0" max="140" value="48">
+              </div>
+            </div>
+          </div>
+          <div class="prev">
+            <canvas id="shapePrev" width="300" height="300" aria-label="모양 미리보기"></canvas>
+            <small id="prevInfo">미리보기</small>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>03 · 함께 흐를 노래</legend>
+        <div class="chips" id="musicChips" role="radiogroup" aria-label="노래">
+          <label class="chip"><input type="radio" name="music" value="jingle" checked><span>징글벨</span></label>
+          <label class="chip"><input type="radio" name="music" value="silent"><span>고요한 밤</span></label>
+          <label class="chip"><input type="radio" name="music" value="wish"><span>We Wish You</span></label>
+          <label class="chip"><input type="radio" name="music" value="bday"><span>생일 축하</span></label>
+          <label class="chip"><input type="radio" name="music" value="yt"><span>유튜브 링크</span></label>
+          <label class="chip"><input type="radio" name="music" value="none"><span>효과음만</span></label>
+        </div>
+        <p class="note" id="musicNote">오르골 소리로 연주돼요. 고르면 몇 초간 들려드려요.</p>
+        <div class="field" id="ytSub" hidden>
+          <label for="fYt">유튜브 주소 <span id="ytState"></span></label>
+          <input type="url" id="fYt" placeholder="https://youtu.be/… 또는 youtube.com/watch?v=…" autocomplete="off">
+          <p class="note">받는 사람 화면 구석에 작은 플레이어로 소리가 나와요. 주소에 <code>t=30</code>처럼 시간을 붙이면 그 부분부터 재생돼요. 유튜브 소리는 저장하는 영상에는 담기지 않아요.</p>
+        </div>
+      </fieldset>
+
+      <p class="err" id="formErr" hidden></p>
+      <div class="actions">
+        <button type="button" class="btn-ghost" id="previewBtn">미리보기</button>
+        <button type="submit" class="btn-primary" id="makeBtn">링크 만들기</button>
+      </div>
+      <div class="result" id="result" hidden>
+        <p>이 링크를 보내면 받는 사람 화면에서 편지가 실행돼요.</p>
+        <div class="linkbox">
+          <input type="text" id="linkOut" readonly aria-label="생성된 링크">
+          <button type="button" class="btn-primary" id="copyBtn">복사</button>
+        </div>
+        <p id="copyMsg" aria-live="polite"></p>
+      </div>
+    </form>
+    <p class="foot">편지 내용과 사진 모양은 링크 안에만 담기고, 서버 어디에도 저장되지 않아요.</p>
+  </div>
+</main>
+
+<section id="letter" hidden aria-live="polite">
+  <div id="intro">
+    <p class="eyebrow">Incoming · letter.js</p>
+    <h2 id="introTitle"></h2>
+    <p class="from" id="introFrom"></p>
+    <button type="button" class="btn-primary" id="runBtn">실행하기 <kbd>Enter</kbd></button>
+    <p class="hint">소리가 함께 나와요 · 화면을 누르면 타이핑을 건너뛸 수 있어요</p>
+  </div>
+  <div id="ytBox" class="big" hidden>
+    <p id="ytMsg">♪ 함께 온 노래</p>
+    <div class="yt-slot"><div id="ytPlayer"></div></div>
+  </div>
+  <p id="skipHint" hidden>tap to skip</p>
+  <button type="button" class="corner-btn" id="muteBtn" hidden>sound on</button>
+  <div id="dock">
+    <p id="tapHint" hidden>드래그하면 돌아가고, 누르면 불꽃이 터져요</p>
+    <div id="endBar" hidden>
+      <button type="button" class="btn-ghost" id="replayBtn">다시 보기</button>
+      <button type="button" class="btn-ghost" id="recBtn">영상 저장</button>
+      <button type="button" class="btn-ghost" id="editBtn" hidden>수정하기</button>
+      <button type="button" class="btn-primary" id="replyBtn">나도 보내기</button>
+    </div>
+  </div>
+</section>
+
+<div id="recBar" hidden><span class="dot"></span><span id="recText">9:16 영상 녹화 중</span><button type="button" class="btn-ghost" id="recCancel">취소</button></div>
+
+<div id="saveSheet" hidden role="dialog" aria-modal="true" aria-labelledby="saveTitle">
+  <div class="sheet">
+    <h3 id="saveTitle">영상이 준비됐어요</h3>
+    <video id="saveVideo" controls playsinline loop></video>
+    <p id="saveNote"></p>
+    <div class="btns">
+      <button type="button" class="btn-ghost" id="saveClose">닫기</button>
+      <button type="button" class="btn-primary" id="saveBtn">저장하기</button>
+    </div>
+    <p id="saveMsg" aria-live="polite"></p>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+// Public address of the standalone page (GitHub Pages). Links made anywhere point here,
+// so the person receiving one needs no account to open it.
+const SHARE_BASE = 'https://yuminkyeong.github.io/Claude/';
+
+const $ = id => document.getElementById(id);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const rnd = i => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+const easeInOut = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const easeOutBack = t => { const c = 1.7; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+const SEG = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('ko', { granularity: 'grapheme' }) : null;
+const seg = s => SEG ? [...SEG.segment(s)].map(x => x.segment) : Array.from(s);
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const rgb = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+const mix = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+const inFrame = (() => { try { return window.top !== window; } catch { return true; } })();
+
+const css = getComputedStyle(document.documentElement);
+const tok = n => hex(css.getPropertyValue(n).trim());
+const C = {
+  night: tok('--night'), frost: tok('--frost'), mute: tok('--mute'), candle: tok('--candle'),
+  berry: tok('--berry'), pine: hex('#7fd39a'),
+  pineDark: hex('#3f9a63'), ice: hex('#bfe3ff'),
+  kw: hex('#e8a87c'), str: hex('#9fd8b0'), num: hex('#f2c46b'), fn: hex('#8ec5ff'),
+  id: hex('#dfe8f5'), op: hex('#7f8aa6'), com: hex('#5f6b88'),
+};
+const REG = {
+  trunk: hex('#a07a55'), heart: hex('#ff7b8f'), heart2: hex('#d9465c'), star: hex('#f2c46b'),
+  snow: hex('#e8eef8'), hat: hex('#8293bd'), nose: hex('#f29c4b'), scarf: hex('#ef6f6c'),
+  wax: hex('#f6efe0'), flame: hex('#ffcf5a'), cream: hex('#f7a8c4'), sponge: hex('#d39a6a'), plate: hex('#9fb0cf'),
+  box: hex('#e0525a'), ribbon: hex('#f2c46b'),
+};
+
+/* =========================================================
+   3D shapes. inside(x, y, z): y runs 0 (top) .. 1 (bottom), x and z are
+   centred on 0 in the same units. Returns a region name, a colour, or null.
+   ========================================================= */
+const sph = (x, y, z, cx, cy, cz, r) => (x - cx) ** 2 + (y - cy) ** 2 + (z - cz) ** 2 <= r * r;
+function inPoly(x, y, P) {
+  let c = false;
+  for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+    if ((P[i][1] > y) !== (P[j][1] > y) && x < (P[j][0] - P[i][0]) * (y - P[i][1]) / (P[j][1] - P[i][1]) + P[i][0]) c = !c;
+  }
+  return c;
+}
+const STAR = Array.from({ length: 10 }, (_, i) => {
+  const r = i % 2 ? 0.2 : 0.5, a = -Math.PI / 2 + i * Math.PI / 5;
+  return [Math.cos(a) * r, 0.53 + Math.sin(a) * r];
+});
+const TIERS = [[0, 0.36, 0.2], [0.18, 0.63, 0.33], [0.38, 0.9, 0.44]];
+const SHAPES = {
+  tree: { key: 'tree', label: '트리', fn: 'tree', hx: 0.46, hz: 0.46, finale: 'star', orn: 0.12, N: 720,
+    inside(x, y, z) {
+      const r = Math.hypot(x, z);
+      for (const [A, B, w] of TIERS) if (y >= A && y <= B && r <= w * (y - A) / (B - A)) return 'leaf';
+      if (y > 0.9 && y <= 1 && r <= 0.065) return 'trunk';
+      return null;
+    } },
+  heart: { key: 'heart', label: '하트', fn: 'heart', hx: 0.52, hz: 0.32, finale: 'beat', orn: 0.05, N: 720,
+    inside(x, y, z) {
+      const X = x * 2.3, U = 1.25 - y * 2.3, D = z * 2.3, a = X * X + 2.25 * D * D + U * U - 1;
+      return a * a * a - X * X * U * U * U - 0.1125 * D * D * U * U * U <= 0 ? 'heart' : null;
+    } },
+  star: { key: 'star', label: '별', fn: 'star', hx: 0.5, hz: 0.18, finale: 'breathe', orn: 0.06, N: 640,
+    inside(x, y, z) {
+      if (!inPoly(x, y, STAR)) return null;
+      const r = Math.hypot(x, y - 0.53);
+      return Math.abs(z) <= 0.025 + 0.14 * (1 - Math.min(1, r / 0.5)) ? 'star' : null;
+    } },
+  snowman: { key: 'snowman', label: '눈사람', fn: 'snowman', hx: 0.32, hz: 0.32, finale: 'breathe', orn: 0.03, N: 720,
+    inside(x, y, z) {
+      const rho = Math.hypot(x, z);
+      if (y >= 0.03 && y < 0.125 && rho < 0.09) return 'hat';
+      if (y >= 0.125 && y < 0.15 && rho < 0.16) return 'hat';
+      if (Math.hypot(x, y - 0.28) < 0.028 && z > 0 && z < 0.25) return 'nose';
+      const head = sph(x, y, z, 0, 0.27, 0, 0.15), body = sph(x, y, z, 0, 0.66, 0, 0.3);
+      if (y >= 0.39 && y < 0.45 && rho < 0.19 && (head || body || rho < 0.17)) return 'scarf';
+      return head || body ? 'snow' : null;
+    } },
+  cake: { key: 'cake', label: '케이크', fn: 'cake', hx: 0.48, hz: 0.48, finale: 'breathe', orn: 0.05, N: 720,
+    inside(x, y, z) {
+      const rho = Math.hypot(x, z);
+      if ((x / 0.045) ** 2 + ((y - 0.07) / 0.065) ** 2 + (z / 0.045) ** 2 <= 1) return 'flame';
+      if (y >= 0.13 && y < 0.32 && rho < 0.03) return 'wax';
+      if (y >= 0.32 && y < 0.56 && rho < 0.26) return 'cream';
+      if (y >= 0.56 && y < 0.62 && rho < 0.42) return 'cream';
+      if (y >= 0.62 && y < 0.9 && rho < 0.42) return 'sponge';
+      if (y >= 0.9 && y < 0.96 && rho < 0.48) return 'plate';
+      return null;
+    } },
+  gift: { key: 'gift', label: '선물', fn: 'gift', hx: 0.46, hz: 0.46, finale: 'breathe', orn: 0.05, N: 720,
+    inside(x, y, z) {
+      if (sph(x, y, z, -0.12, 0.13, 0, 0.1) || sph(x, y, z, 0.12, 0.13, 0, 0.1)) return 'ribbon';
+      const band = Math.abs(x) < 0.05 || Math.abs(z) < 0.05;
+      if (y >= 0.22 && y < 0.34 && Math.abs(x) < 0.46 && Math.abs(z) < 0.46) return band ? 'ribbon' : 'box';
+      if (y >= 0.34 && y < 0.98 && Math.abs(x) < 0.42 && Math.abs(z) < 0.42) return band ? 'ribbon' : 'box';
+      return null;
+    } },
+};
+
+// colour cells: 3-3-2 bit RGB in one byte, 0 = empty
+const pack332 = c => { const v = ((c[0] >> 5) << 5) | ((c[1] >> 5) << 2) | (c[2] >> 6); return v || 1; };
+const unpack332 = v => [((v >> 5) & 7) * 255 / 7, ((v >> 2) & 7) * 255 / 7, (v & 3) * 255 / 3];
+function liftColor(c) {
+  const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  return L < 95 ? mix(c, [205, 214, 235], (95 - L) / 170) : c;
+}
+// a flat picture becomes a puffed relief: thicker in the middle, thin at the outline
+function cellShape(cells, w, h, label) {
+  const dist = new Float32Array(w * h).fill(1e9), q = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (!cells[i]) { dist[i] = 0; q.push(i); }
+    else if (x === 0 || y === 0 || x === w - 1 || y === h - 1) { dist[i] = 1; q.push(i); }
+  }
+  for (let qi = 0; qi < q.length; qi++) {
+    const i = q[qi], x = i % w, y = (i / w) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const j = ny * w + nx;
+      if (dist[j] > dist[i] + 1) { dist[j] = dist[i] + 1; q.push(j); }
+    }
+  }
+  let dmax = 1; for (const d of dist) if (d < 1e8) dmax = Math.max(dmax, d);
+  const aspect = w / h;
+  return { key: null, label, fn: 'draw', hx: aspect / 2, hz: 0.18, finale: 'breathe', orn: 0.03, N: 760, custom: true,
+    inside(x, y, z) {
+      const cx = Math.floor((x / aspect + 0.5) * w), cy = Math.floor(y * h);
+      if (cx < 0 || cy < 0 || cx >= w || cy >= h) return null;
+      const i = cy * w + cx, v = cells[i];
+      if (!v) return null;
+      return Math.abs(z) <= 0.03 + 0.13 * Math.sqrt(dist[i] / dmax) ? unpack332(v) : null;
+    } };
+}
+
+/* ---------- image -> cells ---------- */
+function rasterize(src, sw, sh, maxCells) {
+  const ar = sw / sh;
+  const gw = ar >= 1 ? maxCells : Math.max(8, Math.round(maxCells * ar));
+  const gh = ar >= 1 ? Math.max(8, Math.round(maxCells / ar)) : maxCells;
+  const c = document.createElement('canvas'); c.width = gw; c.height = gh;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(src, 0, 0, gw, gh);
+  return { gw, gh, data: g.getImageData(0, 0, gw, gh).data };
+}
+function toCells(r, thr) {
+  const { gw, gh, data } = r, n = gw * gh;
+  let alpha = 0;
+  for (let i = 0; i < n; i++) if (data[i * 4 + 3] < 200) alpha++;
+  const useAlpha = alpha > n * 0.02;
+  let bg = null;
+  if (!useAlpha) {
+    const ch = [[], [], []];
+    const add = (x, y) => { const i = (y * gw + x) * 4; ch[0].push(data[i]); ch[1].push(data[i + 1]); ch[2].push(data[i + 2]); };
+    for (let x = 0; x < gw; x++) { add(x, 0); add(x, gh - 1); }
+    for (let y = 0; y < gh; y++) { add(0, y); add(gw - 1, y); }
+    bg = ch.map(a => a.sort((p, q) => p - q)[a.length >> 1]);
+  }
+  const cells = new Uint8Array(n); let count = 0;
+  for (let i = 0; i < n; i++) {
+    const r0 = data[i * 4], g0 = data[i * 4 + 1], b0 = data[i * 4 + 2], a0 = data[i * 4 + 3];
+    const on = useAlpha ? a0 >= 110 : Math.hypot(r0 - bg[0], g0 - bg[1], b0 - bg[2]) > thr;
+    if (on) { cells[i] = pack332([r0, g0, b0]); count++; }
+  }
+  if (count < n * 0.03) { for (let i = 0; i < n; i++) cells[i] = pack332([data[i * 4], data[i * 4 + 1], data[i * 4 + 2]]); count = n; }
+  return { w: gw, h: gh, cells, count, useAlpha };
+}
+const emojiCache = new Map();
+function emojiShape(e) {
+  if (emojiCache.has(e)) return emojiCache.get(e);
+  const c = document.createElement('canvas'); c.width = c.height = 160;
+  const g = c.getContext('2d');
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '128px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  g.fillText(e, 80, 88);
+  const t = toCells(rasterize(c, 160, 160, 40), 0);
+  let shape = null;
+  if (t.useAlpha && t.count > 20) {
+    let x0 = t.w, y0 = t.h, x1 = -1, y1 = -1;
+    for (let y = 0; y < t.h; y++) for (let x = 0; x < t.w; x++) if (t.cells[y * t.w + x]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, cells = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) cells[y * w + x] = t.cells[(y + y0) * t.w + x + x0];
+    shape = cellShape(cells, w, h, e);
+  }
+  emojiCache.set(e, shape);
+  return shape;
+}
+const b64 = u8 => { let s = ''; for (const b of u8) s += String.fromCharCode(b); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const imageCache = new Map();
+function resolveShape(s) {
+  if (typeof s === 'string' && SHAPES[s]) return SHAPES[s];
+  if (s && typeof s === 'object') {
+    if (typeof s.e === 'string') return emojiShape(s.e) || SHAPES.heart;
+    if (s.i && s.i.w && s.i.h) {
+      const k = s.i.w + 'x' + s.i.h + ':' + s.i.d;
+      if (!imageCache.has(k)) { try { imageCache.set(k, cellShape(unb64(s.i.d), s.i.w, s.i.h, '사진')); } catch { imageCache.set(k, null); } }
+      if (imageCache.get(k)) return imageCache.get(k);
+    }
+  }
+  return SHAPES.tree;
+}
+
+/* ---------- surface sampling: the shell of a voxelised solid, with outward normals ---------- */
+const sampleCache = new WeakMap();
+function voxelShell(def, step, collect) {
+  const nx = Math.ceil(def.hx / step) + 1, nz = Math.ceil(def.hz / step) + 1, ny = Math.floor(1 / step);
+  const X = 2 * nx + 1, Y = ny + 1, Z = 2 * nz + 1;
+  const grid = new Array(X * Y * Z);
+  const at = (i, j, k) => (i < 0 || j < 0 || k < 0 || i >= X || j >= Y || k >= Z) ? null : grid[(j * Z + k) * X + i];
+  for (let j = 0; j < Y; j++) for (let k = 0; k < Z; k++) for (let i = 0; i < X; i++)
+    grid[(j * Z + k) * X + i] = def.inside((i - nx) * step, j * step, (k - nz) * step);
+  let count = 0;
+  const out = collect ? [] : null;
+  for (let j = 0; j < Y; j++) for (let k = 0; k < Z; k++) for (let i = 0; i < X; i++) {
+    const r = grid[(j * Z + k) * X + i];
+    if (!r) continue;
+    if (at(i + 1, j, k) && at(i - 1, j, k) && at(i, j + 1, k) && at(i, j - 1, k) && at(i, j, k + 1) && at(i, j, k - 1)) continue;
+    count++;
+    if (!out) continue;
+    let gx = 0, gy = 0, gz = 0;
+    for (let dj = -1; dj <= 1; dj++) for (let dk = -1; dk <= 1; dk++) for (let di = -1; di <= 1; di++) {
+      if (!at(i + di, j + dj, k + dk)) { gx += di; gy += dj; gz += dk; }
+    }
+    const l = Math.hypot(gx, gy, gz);
+    out.push({ x: (i - nx) * step, y: j * step, z: (k - nz) * step, r, nx: l ? gx / l : 0, ny: l ? gy / l : 0, nz: l ? gz / l : 1 });
+  }
+  return collect ? out : count;
+}
+function sample3(def, N) {
+  let byN = sampleCache.get(def);
+  if (!byN) { byN = new Map(); sampleCache.set(def, byN); }
+  if (byN.has(N)) return byN.get(N);
+  // surface count grows with 1/step², so one coarse count tells the step for N points
+  const c0 = Math.max(1, voxelShell(def, 0.05));
+  let step = clamp(0.05 * Math.sqrt(c0 / (N * 1.15)), 0.007, 0.2);
+  let all = voxelShell(def, step, true);
+  if (all.length < N) { step *= Math.sqrt(all.length / (N * 1.25)); all = voxelShell(def, step, true); }
+  const M = all.length, pts = [];
+  for (let i = 0; i < N && M; i++) {
+    const p = all[Math.min(M - 1, Math.floor((i + 0.5) * M / N))];
+    pts.push({ ...p, x: p.x + (rnd(i * 3 + 1) - 0.5) * step * 0.35, y: p.y + (rnd(i * 3 + 2) - 0.5) * step * 0.35, z: p.z + (rnd(i * 3 + 3) - 0.5) * step * 0.35 });
+  }
+  pts.sort((a, b) => a.y - b.y);
+  let rMax = 0.1; for (const p of pts) rMax = Math.max(rMax, Math.hypot(p.x, p.z));
+  const res = { step, pts, rMax };
+  byN.set(N, res);
+  return res;
+}
+function colorFor(r, y, i) {
+  if (Array.isArray(r)) return liftColor(r);
+  if (r === 'leaf') return mix(C.pineDark, C.pine, rnd(i + 3) * 0.9);
+  if (r === 'heart') return mix(REG.heart, REG.heart2, clamp(y, 0, 1) * 0.9 + rnd(i) * 0.1);
+  const base = REG[r] || C.frost, k = (rnd(i + 5) - 0.5) * 0.16;
+  return k > 0 ? mix(base, [255, 255, 255], k) : mix(base, [0, 0, 0], -k);
+}
+// letters for the lights: the message repeats; a short one is joined with the name so it still reads as a phrase
+function glyphSeq(p) {
+  let base = seg(clean(p.m)).filter(c => c.trim());
+  if (!base.length) base = seg('메리크리스마스');
+  const name = seg(clean(p.t)).filter(c => c.trim());
+  return base.length < 6 && name.length ? [...base, '·', ...name, '*'] : [...base, '*'];
+}
+
+/* =========================================================
+   Link encoding: JSON -> deflate -> base62 (fits a plain #hash)
+   ========================================================= */
+const B62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+function toB62(bytes) {
+  let n = 1n;
+  for (const b of bytes) n = (n << 8n) | BigInt(b);
+  const out = [];
+  while (n > 0n) { out.push(B62[Number(n % 62n)]); n /= 62n; }
+  return out.reverse().join('');
+}
+function fromB62(s) {
+  let n = 0n;
+  for (const ch of s) { const i = B62.indexOf(ch); if (i < 0) throw new Error('bad'); n = n * 62n + BigInt(i); }
+  const bytes = [];
+  while (n > 1n) { bytes.push(Number(n & 255n)); n >>= 8n; }
+  if (n !== 1n) throw new Error('bad');
+  return new Uint8Array(bytes.reverse());
+}
+const streamBytes = async (bytes, T) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(T)).arrayBuffer());
+async function pack(obj) {
+  const json = new TextEncoder().encode(JSON.stringify(obj));
+  if (window.CompressionStream) {
+    try { return 'Z' + toB62(await streamBytes(json, new CompressionStream('deflate-raw'))); } catch { /* plain */ }
+  }
+  return 'P' + toB62(json);
+}
+async function unpack(s) {
+  const bytes = fromB62(s.slice(1));
+  const json = s[0] === 'Z' ? await streamBytes(bytes, new DecompressionStream('deflate-raw')) : bytes;
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(json));
+}
+const MUSIC_IDS = ['jingle', 'silent', 'wish', 'bday', 'none'];
+function sanitize(o) {
+  if (!o || typeof o.t !== 'string' || typeof o.m !== 'string') throw new Error('bad');
+  const p = { t: seg(o.t).slice(0, 10).join(''), f: seg(String(o.f || '')).slice(0, 10).join(''), m: seg(o.m).slice(0, 60).join(''), s: 'tree', b: 'none' };
+  if (typeof o.s === 'string' && SHAPES[o.s]) p.s = o.s;
+  else if (o.s && typeof o.s.e === 'string') p.s = { e: seg(o.s.e)[0] || '♥' };
+  else if (o.s && o.s.i && Number.isInteger(o.s.i.w) && Number.isInteger(o.s.i.h) && o.s.i.w <= 64 && o.s.i.h <= 64 && typeof o.s.i.d === 'string') {
+    const d = unb64(o.s.i.d);
+    if (d.length === o.s.i.w * o.s.i.h) p.s = { i: { w: o.s.i.w, h: o.s.i.h, d: o.s.i.d } };
+  }
+  if (typeof o.b === 'string' && MUSIC_IDS.includes(o.b)) p.b = o.b;
+  else if (o.b && typeof o.b.y === 'string' && /^[A-Za-z0-9_-]{11}$/.test(o.b.y)) p.b = { y: o.b.y, s: clamp(+o.b.s || 0, 0, 36000) | 0 };
+  return p;
+}
+async function readLink() {
+  const h = location.hash.match(/^#C-([ZP][0-9A-Za-z]+)$/);
+  const old = location.hash.match(/^#L-([0-9A-Za-z]+)$/);
+  if (!h && !old) return null;
+  try {
+    if (h) return sanitize(await unpack(h[1]));
+    return sanitize(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(fromB62(old[1]))));
+  } catch { return 'bad'; }
+}
+const shareBase = () => (inFrame || location.protocol === 'file:') ? SHARE_BASE : location.href.split('#')[0];
+
+/* =========================================================
+   Audio: music-box bells, melodies, recording tap
+   ========================================================= */
+const A = { ctx: null, master: null, muted: false, lastChime: 0 };
+function audioInit() {
+  if (A.ctx) { if (A.ctx.state === 'suspended') A.ctx.resume(); return; }
+  try {
+    A.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    A.master = A.ctx.createGain(); A.master.gain.value = 0.32;
+    A.master.connect(A.ctx.destination);
+  } catch { A.ctx = null; }
+}
+function bell(freq, when = 0, vol = 0.4, dur = 1.8) {
+  if (!A.ctx || A.muted) return;
+  const t = A.ctx.currentTime + Math.max(0, when);
+  const g = A.ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.connect(A.master);
+  [[1, 1], [2.76, 0.18], [5.4, 0.06]].forEach(([m, v]) => {
+    const o = A.ctx.createOscillator(), og = A.ctx.createGain();
+    o.type = 'sine'; o.frequency.value = freq * m; og.gain.value = v;
+    o.connect(og).connect(g); o.start(t); o.stop(t + dur + 0.05);
+  });
+}
+function tick() {
+  if (!A.ctx || A.muted) return;
+  const t = A.ctx.currentTime, o = A.ctx.createOscillator(), g = A.ctx.createGain();
+  o.type = 'square'; o.frequency.value = 1800 + Math.random() * 500;
+  g.gain.setValueAtTime(0.012, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+  o.connect(g).connect(A.master); o.start(t); o.stop(t + 0.04);
+}
+const SCALE = [587.3, 659.3, 740, 880, 987.8, 1174.7, 1318.5, 1480, 1760, 1975.5];
+const NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const parseMel = s => s.trim().split(/\s+/).map(tk => {
+  const [n, d] = tk.split(':');
+  return [n === 'R' ? null : 12 * (+n.slice(-1) + 1) + NOTE[n[0]], +d];
+});
+// Public-domain melodies, written in C and played a step up in D, one octave high like a music box.
+const MEL = {
+  jingle: { name: 'jingle_bells', beat: 0.27, notes: parseMel(`E4:1 E4:1 E4:2 E4:1 E4:1 E4:2 E4:1 G4:1 C4:1.5 D4:.5 E4:4 F4:1 F4:1 F4:1.5 F4:.5 F4:1 E4:1 E4:1 E4:.5 E4:.5 E4:1 D4:1 D4:1 E4:1 D4:2 G4:2
+    E4:1 E4:1 E4:2 E4:1 E4:1 E4:2 E4:1 G4:1 C4:1.5 D4:.5 E4:4 F4:1 F4:1 F4:1.5 F4:.5 F4:1 E4:1 E4:1 E4:.5 E4:.5 G4:1 G4:1 F4:1 D4:1 C4:4 R:2`) },
+  silent: { name: 'silent_night', beat: 0.27, notes: parseMel(`G4:1.5 A4:.5 G4:1 E4:3 G4:1.5 A4:.5 G4:1 E4:3 D5:2 D5:1 B4:3 C5:2 C5:1 G4:3
+    A4:2 A4:1 C5:1.5 B4:.5 A4:1 G4:1.5 A4:.5 G4:1 E4:3 A4:2 A4:1 C5:1.5 B4:.5 A4:1 G4:1.5 A4:.5 G4:1 E4:3
+    D5:2 D5:1 F5:1.5 D5:.5 B4:1 C5:3 E5:3 C5:1.5 G4:.5 E4:1 G4:1.5 F4:.5 D4:1 C4:6 R:3`) },
+  wish: { name: 'we_wish_you', beat: 0.36, notes: parseMel(`G4:1 C5:1 C5:.5 D5:.5 C5:.5 B4:.5 A4:1 A4:1 A4:1 D5:1 D5:.5 E5:.5 D5:.5 C5:.5 B4:1 G4:1 G4:1
+    E5:1 E5:.5 F5:.5 E5:.5 D5:.5 C5:1 A4:1 G4:.5 G4:.5 A4:1 D5:1 B4:1 C5:3 R:2`) },
+  bday: { name: 'happy_birthday', beat: 0.38, notes: parseMel(`G4:.75 G4:.25 A4:1 G4:1 C5:1 B4:2 G4:.75 G4:.25 A4:1 G4:1 D5:1 C5:2
+    G4:.75 G4:.25 G5:1 E5:1 C5:1 B4:1 A4:2 F5:.75 F5:.25 E5:1 C5:1 D5:1 C5:2 R:2`) },
+};
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const M = { timer: null, i: 0, t: 0, mel: null, stopAt: 0 };
+function bgmStart(id, seconds = 0) {
+  bgmStop();
+  const mel = MEL[id];
+  if (!mel || !A.ctx) return;
+  M.mel = mel; M.i = 0; M.t = A.ctx.currentTime + 0.12;
+  M.stopAt = seconds ? A.ctx.currentTime + seconds : 0;
+  const sched = () => {
+    if (!A.ctx || !M.mel) return;
+    if (M.stopAt && A.ctx.currentTime > M.stopAt) return bgmStop();
+    while (M.t < A.ctx.currentTime + 0.35) {
+      const [m, b] = M.mel.notes[M.i], d = b * M.mel.beat;
+      if (m != null) bell(mtof(m + 14), M.t - A.ctx.currentTime, 0.2, Math.min(2.4, d * 3 + 0.7));
+      M.t += d; M.i = (M.i + 1) % M.mel.notes.length;
+    }
+  };
+  sched(); M.timer = setInterval(sched, 60);
+}
+function bgmStop() { clearInterval(M.timer); M.timer = null; M.mel = null; }
+
+/* ---------- YouTube (a small visible player; only on a deployed page) ---------- */
+const YTM = { api: null, player: null, id: null, ok: false };
+function ytApi() {
+  if (YTM.api) return YTM.api;
+  YTM.api = new Promise((res, rej) => {
+    if (window.YT && window.YT.Player) return res(window.YT);
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { prev && prev(); res(window.YT); };
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api'; s.async = true;
+    s.onerror = () => rej(new Error('blocked'));
+    document.head.appendChild(s);
+    setTimeout(() => rej(new Error('timeout')), 9000);
+  });
+  YTM.api.catch(() => { YTM.api = null; });
+  return YTM.api;
+}
+function parseYT(url) {
+  try {
+    const u = new URL(url.trim());
+    let id = null;
+    if (/(^|\.)youtu\.be$/.test(u.hostname)) id = u.pathname.slice(1).split('/')[0];
+    else if (/(^|\.)youtube\.com$/.test(u.hostname)) id = u.searchParams.get('v') || (u.pathname.match(/\/(shorts|embed|live)\/([^/?]+)/) || [])[2];
+    if (!id || !/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
+    const t = u.searchParams.get('t') || u.searchParams.get('start') || '0';
+    const m = String(t).match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);
+    const s = m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0;
+    return { y: id, s };
+  } catch { return null; }
+}
+async function ytPrepare(b) {
+  const box = $('ytBox');
+  box.hidden = false; box.className = 'big';
+  $('ytMsg').textContent = '♪ 함께 온 노래를 불러오는 중';
+  YTM.ok = false;
+  try {
+    const YT = await ytApi();
+    if (YTM.player && YTM.id === b.y) { YTM.ok = true; $('ytMsg').textContent = '♪ 실행하면 함께 재생돼요'; return; }
+    if (YTM.player) { try { YTM.player.destroy(); } catch { /* ignore */ } }
+    box.querySelector('.yt-slot').innerHTML = '<div id="ytPlayer"></div>';
+    YTM.id = b.y;
+    YTM.player = new YT.Player('ytPlayer', {
+      width: '100%', height: '100%', videoId: b.y,
+      playerVars: { start: b.s || 0, playsinline: 1, rel: 0 },
+      events: { onReady: () => { YTM.ok = true; $('ytMsg').textContent = '♪ 실행하면 함께 재생돼요'; } },
+    });
+  } catch {
+    $('ytMsg').textContent = '이 화면에서는 유튜브를 재생할 수 없어요. 배포된 주소에서 열면 나와요.';
+  }
+}
+function ytPlay() { try { YTM.player && YTM.player.playVideo(); } catch { /* ignore */ } $('ytBox').className = 'mini'; if (!YTM.ok) $('ytBox').hidden = true; }
+function ytStop() { try { YTM.player && YTM.player.pauseVideo(); } catch { /* ignore */ } $('ytBox').hidden = true; }
+
+/* =========================================================
+   Canvas + camera
+   ========================================================= */
+const cv = $('stage'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, glow = null;
+const REC = { on: false, mr: null, chunks: [], dest: null, result: null, cancelled: false, mime: '' };
+const CAM = { th: -0.5, ph: 0.2, auto: reduce ? 0.00008 : 0.0004, spin: 0, drag: false, c: 1, s: 0, cp: 1, sp: 0 };
+CAM.spin = CAM.auto;
+const VIEW = { cx: 0, cy: 0, sc: 1, top: 0, h: 1, D: 2.6 };
+function camFrame(dt) {
+  if (!CAM.drag) { CAM.spin += (CAM.auto - CAM.spin) * Math.min(1, dt * 0.0015); CAM.th += CAM.spin * dt; }
+  CAM.c = Math.cos(CAM.th); CAM.s = Math.sin(CAM.th); CAM.cp = Math.cos(CAM.ph); CAM.sp = Math.sin(CAM.ph);
+}
+// shape coords -> [screenX, screenY, depth (toward viewer +), perspective factor]
+function proj(x, y, z, k = 1) {
+  const X = x * k, Y = (y - 0.5) * k, Z = z * k;
+  const x1 = X * CAM.c + Z * CAM.s, z1 = -X * CAM.s + Z * CAM.c;
+  const y2 = Y * CAM.cp + z1 * CAM.sp, z2 = -Y * CAM.sp + z1 * CAM.cp;
+  const f = VIEW.D / (VIEW.D - z2);
+  return [VIEW.cx + x1 * VIEW.sc * f, VIEW.cy + y2 * VIEW.sc * f, z2, f];
+}
+function resize() {
+  let left = 0, top = 0;
+  if (REC.on) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    H = Math.max(200, Math.min(vh - 64, (vw - 24) * 16 / 9));
+    W = H * 9 / 16;
+    left = (vw - W) / 2; top = Math.max(48, (vh - H) / 2 + 16);
+    DPR = 720 / W;
+  } else {
+    W = window.innerWidth; H = window.innerHeight;
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+  }
+  Object.assign(cv.style, { left: left + 'px', top: top + 'px', width: W + 'px', height: H + 'px' });
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  glow = ctx.createRadialGradient(W / 2, H * 0.95, 0, W / 2, H * 0.95, Math.max(W, H) * 0.7);
+  glow.addColorStop(0, 'rgba(242,196,107,0.10)');
+  glow.addColorStop(1, 'rgba(242,196,107,0)');
+  makeSnow();
+  if (S.lines) layoutCode();
+  if (S.def) layoutView();
+}
+const spriteCache = new Map();
+function spriteFor(c) {
+  const key = pack332(c);
+  let s = spriteCache.get(key);
+  if (s) return s;
+  s = document.createElement('canvas'); s.width = s.height = 64;
+  const g = s.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, rgb(c, 0.9)); gr.addColorStop(0.3, rgb(c, 0.35)); gr.addColorStop(1, rgb(c, 0));
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  spriteCache.set(key, s);
+  return s;
+}
+const ORN = [C.candle, C.berry, C.ice].map(c => ({ c, img: spriteFor(c) }));
+
+const S = {
+  mode: 'compose', phase: 'idle', payload: null, preview: false,
+  lines: null, code: null, parts: [], def: null, form: null, pts: null, N: 0, halo: [],
+  tStart: 0, schedule: [], typed: 0, typingDone: 0, runAt: 0, flyAt: 0, flyEnd: 0, litAt: 0,
+  flash: 0, fx: [], rockets: [], fall: [], snow: [], shown: {}, autoFx: 0, items: [],
+};
+
+/* ---------- snow ---------- */
+function makeSnow() {
+  const n = Math.min(150, Math.round(W * H / 9000));
+  S.snow = Array.from({ length: n }, () => ({
+    x: Math.random() * W, y: Math.random() * H, r: 0.6 + Math.random() * 1.8,
+    vy: 0.012 + Math.random() * 0.03, ph: Math.random() * 6.28, a: 0.25 + Math.random() * 0.55,
+  }));
+}
+function drawSnow(dt, now) {
+  for (const f of S.snow) {
+    f.y += f.vy * dt * (reduce ? 0.3 : 1);
+    f.x += Math.sin(now * 0.0006 + f.ph) * 0.15;
+    if (f.y > H + 4) { f.y = -4; f.x = Math.random() * W; }
+    ctx.fillStyle = rgb(C.frost, f.a);
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.283); ctx.fill();
+  }
+}
+
+/* ---------- code ---------- */
+const clean = s => s.replace(/["`\\\n\r]/g, '').trim();
+function buildLines(p, def, N) {
+  const K = kind => t => [t, kind];
+  const c = K('com'), k = K('kw'), s = K('str'), n = K('num'), f = K('fn'), o = K('op'), v = K('id');
+  const to = clean(p.t), from = clean(p.f) || '비밀 산타';
+  const msg = seg(clean(p.m));
+  const chunks = [];
+  for (let i = 0; i < msg.length; i += 12) chunks.push(msg.slice(i, i + 12).join(''));
+  if (!chunks.length) chunks.push('메리 크리스마스');
+  const L = [];
+  L.push([c('// 2026.12.25 · for ' + to)]);
+  L.push([k('const '), v('to'), o('   = '), s('"' + to + '"'), o(';')]);
+  L.push([k('const '), v('from'), o(' = '), s('"' + from + '"'), o(';')]);
+  chunks.forEach((ch, i) => {
+    const head = i === 0 ? [k('const '), v('msg'), o('  = ')] : [o('           + ')];
+    L.push([...head, s('"' + ch + '"'), ...(i === chunks.length - 1 ? [o(';')] : [])]);
+  });
+  if (p.s && p.s.e) L.push([k('const '), v('img'), o('  = '), f('emoji'), o('('), s('"' + p.s.e + '"'), o(');')]);
+  if (p.s && p.s.i) L.push([k('const '), v('img'), o('  = '), f('load'), o('('), s('"photo.png"'), o(');')]);
+  if (typeof p.b === 'string' && MEL[p.b]) L.push([f('play'), o('('), s('"' + MEL[p.b].name + '"'), o(');')]);
+  if (p.b && p.b.y) L.push([f('play'), o('('), s('"youtu.be/' + p.b.y + '"'), o(');')]);
+  L.push([]);
+  L.push([k('function '), f(def.fn), o('('), v('n'), o(') {')]);
+  L.push([o('  '), k('for '), o('('), k('let '), v('i'), o(' = '), n('0'), o('; '), v('i'), o(' < '), v('n'), o('; '), v('i'), o('++)')]);
+  L.push([o('    '), f('place'), o('('), v('msg'), o('['), v('i'), o(' % '), v('msg'), o('.'), v('length'), o('], '), v('i'), o(');')]);
+  L.push([o('  '), f('light'), o('('), v('to'), o(');')]);
+  L.push([o('}')]);
+  L.push([f(def.fn), o('('), n(String(N)), o(');')]);
+  return L;
+}
+const codeFont = sz => `${sz}px "JetBrains Mono","IBM Plex Sans KR",ui-monospace,monospace`;
+const PROMPT = '$ node letter.js --3d';
+function layoutCode() {
+  const lines = S.lines;
+  ctx.font = codeFont(100);
+  let maxw = ctx.measureText(PROMPT).width;
+  for (const ln of lines) { let w = 0; for (const [t] of ln) w += ctx.measureText(t).width; maxw = Math.max(maxw, w); }
+  const rows = lines.length + 2;
+  let sz = Math.min(17, (W * 0.9) / (maxw / 100), (H * 0.72) / (rows * 1.55));
+  sz = Math.max(7, Math.floor(sz * 2) / 2);
+  const lh = sz * 1.55, blockW = maxw / 100 * sz, blockH = rows * lh;
+  const x0 = Math.max(10, (W - blockW) / 2), y0 = (H - blockH) / 2 + sz;
+  ctx.font = codeFont(sz);
+  const chars = [];
+  lines.forEach((ln, li) => {
+    let x = x0; const y = y0 + li * lh;
+    for (const [t, kind] of ln) for (const ch of seg(t)) {
+      const w = ctx.measureText(ch).width;
+      chars.push({ ch, kind, x, y, w, space: !ch.trim() });
+      x += w;
+    }
+    chars.push({ ch: '\n', kind: 'op', x, y, w: 0, space: true, nl: true });
+  });
+  S.code = { sz, lh, x0, y0, chars, promptY: y0 + (lines.length + 1) * lh };
+}
+
+/* ---------- scene layout: ASCII grid above, HUD, code panel below ---------- */
+const RAMP = '.,:-=+*xo%#@';
+const LIGHT_COL = hex('#ffd77a');
+const FLOOR = (() => {
+  const xs = [], zs = [];
+  for (let x = -1.7; x <= 1.7; x += 0.042) for (let z = -1.5; z <= 1.5; z += 0.042) { xs.push(x); zs.push(z); }
+  return { x: Float32Array.from(xs), z: Float32Array.from(zs), n: xs.length };
+})();
+const G = { fs: 7, cw: 4, ch: 8, cols: 0, rows: 0, top: 0, zb: null, own: null, kind: null, val: null };
+function layoutView() {
+  const dockH = REC.on ? 30 : 118;
+  const top = REC.on ? 14 : 48;
+  const panelH = clamp(H * 0.19, 112, 180);
+  const hudH = 50;
+  const sceneBottom = H - dockH - panelH - hudH - 10;
+  const sceneH = Math.max(140, sceneBottom - top);
+  const span = 2 * S.form.rMax * 0.86 * 1.25;
+  const h = Math.max(90, Math.min(sceneH * 0.86, (W * 0.94) / span, 700));
+  VIEW.top = top; VIEW.h = h; VIEW.cx = W / 2; VIEW.cy = top + sceneH * 0.44; VIEW.sc = h * 0.86;
+  VIEW.sceneTop = top; VIEW.sceneBottom = top + sceneH;
+  VIEW.hudTop = VIEW.sceneBottom + 6;
+  VIEW.panelTop = VIEW.hudTop + hudH; VIEW.panelBottom = VIEW.panelTop + panelH;
+  // about 52 text rows across the height of the shape
+  G.ch = Math.max(6, h / 48); G.fs = G.ch / 1.12; G.cw = G.fs * 0.6;
+  G.top = top;
+  G.cols = Math.ceil(W / G.cw); G.rows = Math.ceil(sceneH / G.ch);
+  const n = G.cols * G.rows;
+  G.zb = new Float32Array(n); G.own = new Int32Array(n); G.kind = new Uint8Array(n); G.val = new Float32Array(n);
+  G.font = `${G.fs.toFixed(2)}px "JetBrains Mono",ui-monospace,monospace`;
+  G.lightFont = `700 ${(G.ch * 1.08).toFixed(2)}px "Gowun Batang",serif`;
+}
+// palette of base colours so each (colour, brightness) string is built once
+const PAL = { list: [], idx: new Map(), cache: [] };
+function palId(c) {
+  const key = pack332(c) * 8 + 0;
+  if (PAL.idx.has(key)) return PAL.idx.get(key);
+  const id = PAL.list.length;
+  PAL.list.push(c); PAL.idx.set(key, id);
+  PAL.cache.push(Array.from({ length: 16 }, (_, l) => rgb(l > 12 ? mix(c, [255, 255, 255], (l - 12) * 0.09) : mix(C.night, c, 0.2 + 0.8 * l / 12))));
+  return id;
+}
+const FLOOR_COL = Array.from({ length: 16 }, (_, l) => rgb(mix(C.night, [150, 168, 205], 0.08 + 0.55 * l / 15)));
+function buildScene(p) {
+  const def = S.def, pts = S.form.pts, n = pts.length;
+  const sc = {
+    n, x: new Float32Array(n), y: new Float32Array(n), z: new Float32Array(n),
+    nx: new Float32Array(n), ny: new Float32Array(n), nz: new Float32Array(n),
+    col: new Uint16Array(n), type: new Uint8Array(n), jit: new Int8Array(n), reveal: new Float32Array(n),
+    glyph: new Array(n), orns: [],
+  };
+  const seq = glyphSeq(p), lights = [];
+  // ornaments: little clusters of red, gold and silver on the surface
+  const ornCount = def.custom ? 0 : def.key === 'tree' ? 16 : 7;
+  const centers = [];
+  for (let i = 0; i < ornCount; i++) {
+    const q = pts[Math.floor(rnd(i * 13 + 7) * n)];
+    if (q.r === 'trunk' || q.r === 'flame') continue;
+    centers.push({ x: q.x, y: q.y, z: q.z, c: [C.berry, C.candle, C.ice][i % 3] });
+  }
+  sc.orns = centers;
+  pts.forEach((q, i) => {
+    sc.x[i] = q.x; sc.y[i] = q.y; sc.z[i] = q.z; sc.nx[i] = q.nx; sc.ny[i] = q.ny; sc.nz[i] = q.nz;
+    sc.jit[i] = Math.floor(rnd(i + 77) * 3) - 1;
+    sc.reveal[i] = 300 + (1 - q.y) * 2600 + rnd(i + 91) * 260;
+    let c = q.r === 'trunk' ? REG.trunk : colorFor(q.r, q.y, i), type = 0;
+    const orn = centers.find(o => (o.x - q.x) ** 2 + (o.y - q.y) ** 2 + (o.z - q.z) ** 2 < 0.0016);
+    if (orn) { c = orn.c; type = 2; }
+    else if (q.r !== 'trunk') {
+      // a garland of message letters spiralling around the shape
+      const turns = 3.2, a = Math.atan2(q.z, q.x) / (Math.PI * 2);
+      const onHelix = def.custom ? rnd(i + 5) < 0.035 : Math.abs(((a - q.y * turns) % 1 + 1.5) % 1 - 0.5) < 0.028;
+      if (onHelix) { type = 1; lights.push({ i, t: def.custom ? q.y * 10 + q.x : q.y * turns + ((a % 1) + 1) % 1 }); }
+    }
+    sc.col[i] = palId(c); sc.type[i] = type;
+  });
+  lights.sort((a, b) => a.t - b.t).forEach((l, k) => { sc.glyph[l.i] = seq[k % seq.length]; });
+  sc.lightTotal = lights.length;
+  sc.flyEnd = Math.max(...sc.reveal) + 500;
+  return sc;
+}
+
+/* ---------- play ---------- */
+async function loadFonts(p) {
+  const text = p.t + p.f + p.m + '비밀산타메리크리스마스✦·';
+  try {
+    await Promise.race([
+      Promise.all([
+        document.fonts.load('16px "JetBrains Mono"', 'const msg = "a"; .,:-=+*xo%#@'),
+        document.fonts.load('16px "IBM Plex Sans KR"', text),
+        document.fonts.load('700 16px "Gowun Batang"', text),
+      ]),
+      new Promise(r => setTimeout(r, 2500)),
+    ]);
+  } catch { /* fallback fonts are fine */ }
+}
+const densityFor = def => def.custom ? 8000 : 10000;
+function prepare(p) {
+  S.def = resolveShape(p.s);
+  S.N = densityFor(S.def);
+  S.lines = buildLines(p, S.def, S.N);
+  layoutCode();
+  S.form = sample3(S.def, S.N);
+  layoutView();
+  S.sc = buildScene(p);
+  const chars = S.code.chars, code = [];
+  chars.forEach((c, ci) => { if (!c.space) code.push({ ci, ch: c.ch, col: C[c.kind] }); });
+  // each code letter flies to a point and lands just as that part of the shape appears
+  S.parts = code.map((part, k) => {
+    const tj = Math.floor(rnd(k * 5.3 + 3) * S.sc.n), dur = reduce ? 400 : 900 + rnd(k + 13) * 600;
+    return { ...part, tj, dur, delay: Math.max(0, S.sc.reveal[tj] - dur), bend: (rnd(k + 21) - 0.5) * 200, lift: 40 + rnd(k + 29) * 140 };
+  });
+  S.fall = [];
+  S.letters = 0; S.fps = 30; S.lightsShown = 0;
+  const per = reduce ? 2 : clamp(3800 / chars.length, 8, 36);
+  let t = 0; S.schedule = chars.map(c => { t += c.nl ? per * 4 : per * (0.6 + Math.random() * 0.8); return t; });
+  S.typingDone = t;
+}
+function resetLetterUI() {
+  ['tapHint', 'endBar', 'skipHint'].forEach(id => $(id).hidden = true);
+  $('endBar').classList.remove('show');
+  S.fx = []; S.rockets = []; S.shown = {}; S.flash = 0; S.litAt = 0; S.autoFx = 0; S.flyAt = performance.now();
+}
+async function openLetter(p, preview) {
+  S.mode = 'letter'; S.payload = p; S.preview = preview; S.phase = 'idle';
+  S.lines = null; S.def = null;
+  bgmStop();
+  $('compose').hidden = true; $('letter').hidden = false; $('intro').hidden = false;
+  $('introTitle').textContent = `${p.t}에게 도착한 코드 한 줄`;
+  $('introFrom').textContent = `From. ${p.f || '비밀 산타'}`;
+  $('editBtn').hidden = !preview;
+  $('replyBtn').textContent = preview ? '링크 만들기' : '나도 보내기';
+  $('muteBtn').hidden = true;
+  resetLetterUI();
+  if (p.b && p.b.y) ytPrepare(p.b); else $('ytBox').hidden = true;
+  $('runBtn').disabled = true;
+  await loadFonts(p);
+  await new Promise(r => setTimeout(r, 30));
+  { const d = resolveShape(p.s); sample3(d, densityFor(d)); }
+  $('runBtn').disabled = false;
+  $('runBtn').focus({ preventScroll: true });
+}
+function run() {
+  audioInit();
+  $('intro').hidden = true;
+  $('muteBtn').hidden = false;
+  resetLetterUI();
+  prepare(S.payload);
+  CAM.th = -0.5; CAM.ph = 0.2; CAM.spin = CAM.auto;
+  S.phase = 'typing'; S.tStart = performance.now(); S.typed = 0;
+  $('skipHint').hidden = REC.on;
+  const b = S.payload.b;
+  if (typeof b === 'string' && MEL[b]) bgmStart(b);
+  else bgmStop();
+  if (b && b.y) {
+    ytPlay();
+    if (YTM.player && YTM.ok) { try { YTM.player.seekTo(b.s || 0, true); } catch { /* ignore */ } }
+  }
+}
+function skipTyping(now) { if (S.phase === 'typing') S.tStart = now - S.typingDone; }
+const hasBgm = () => S.payload && S.payload.b && S.payload.b !== 'none';
+
+/* ---------- fireworks ---------- */
+function launch(x, y, delay = 0) {
+  const sx = clamp(x + (Math.random() - 0.5) * 80, 20, W - 20);
+  S.rockets.push({ x0: sx, y0: H + 10, x, y, t: -delay, dur: reduce ? 1 : 420 });
+}
+function burst(x, y) {
+  const chars = glyphSeq(S.payload).filter(c => c !== '*' && c !== '·');
+  const cols = [C.candle, C.berry, C.ice, C.frost, C.pine];
+  const base = cols[Math.floor(Math.random() * cols.length)];
+  const n = reduce ? 24 : 70, sc = Math.min(1, W / 420) * 0.6 + 0.4;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 6.283, sp = (0.08 + Math.random() * 0.26) * sc;
+    S.fx.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0, max: 1100 + Math.random() * 700,
+      col: Math.random() < 0.75 ? base : C.frost,
+      ch: chars.length && Math.random() < 0.28 ? chars[Math.floor(Math.random() * chars.length)] : null,
+    });
+  }
+  const note = SCALE[Math.floor(clamp(1 - y / H, 0, 0.99) * SCALE.length)];
+  const v = hasBgm() ? 0.16 : 0.32;
+  bell(note, 0, v, 1.6); bell(note * 1.5, 0.05, v * 0.4, 1.2);
+}
+function drawFx(dt) {
+  for (let i = S.rockets.length - 1; i >= 0; i--) {
+    const r = S.rockets[i]; r.t += dt;
+    if (r.t < 0) continue;
+    const e = Math.min(1, r.t / r.dur), k = 1 - Math.pow(1 - e, 2);
+    const x = lerp(r.x0, r.x, k), y = lerp(r.y0, r.y, k);
+    ctx.strokeStyle = rgb(C.candle, 0.7); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - (r.x - r.x0) * 0.05, y + 18); ctx.stroke();
+    if (e >= 1) { burst(r.x, r.y); S.rockets.splice(i, 1); }
+  }
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 13px "Gowun Batang", serif`;
+  for (let i = S.fx.length - 1; i >= 0; i--) {
+    const f = S.fx[i];
+    f.life += dt;
+    const drag = Math.pow(0.986, dt / 16);
+    f.vx *= drag; f.vy = f.vy * drag + 0.00016 * dt;
+    f.x += f.vx * dt; f.y += f.vy * dt;
+    const a = 1 - f.life / f.max;
+    if (a <= 0) { S.fx.splice(i, 1); continue; }
+    if (f.ch) { ctx.fillStyle = rgb(f.col, a); ctx.fillText(f.ch, f.x, f.y); }
+    else {
+      ctx.strokeStyle = rgb(f.col, a); ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x - f.vx * 40, f.y - f.vy * 40); ctx.stroke();
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/* ---------- finale pieces ---------- */
+function drawStar(x, y, R, a, now) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalCompositeOperation = 'lighter';
+  const rays = 12, spin = now * 0.00012;
+  for (let i = 0; i < rays; i++) {
+    const ang = spin + i * Math.PI * 2 / rays, len = R * (2.4 + 0.8 * Math.sin(now * 0.002 + i));
+    const g = ctx.createLinearGradient(0, 0, Math.cos(ang) * len, Math.sin(ang) * len);
+    g.addColorStop(0, rgb(C.candle, 0.35 * a)); g.addColorStop(1, rgb(C.candle, 0));
+    ctx.strokeStyle = g; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(ang) * len, Math.sin(ang) * len); ctx.stroke();
+  }
+  ctx.drawImage(ORN[0].img, -R * 2.2, -R * 2.2, R * 4.4, R * 4.4);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 ? R * 0.42 : R, ang = -Math.PI / 2 + i * Math.PI / 5;
+    ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
+  }
+  ctx.closePath();
+  ctx.fillStyle = rgb(mix(C.candle, [255, 248, 225], 0.35), a);
+  ctx.fill();
+  ctx.restore();
+}
+function beatPulse(t) {
+  const ph = (t % 1100) / 1100;
+  return Math.exp(-(((ph - 0.08) / 0.05) ** 2)) + 0.6 * Math.exp(-(((ph - 0.28) / 0.06) ** 2));
+}
+function wrapText(text, maxW) {
+  const words = text.split(' '), lines = [];
+  let line = '';
+  const split = w => {
+    if (ctx.measureText(w).width <= maxW) return w;
+    let cur = '';
+    for (const ch of seg(w)) { if (ctx.measureText(cur + ch).width > maxW && cur) { lines.push(cur); cur = ch; } else cur += ch; }
+    return cur;
+  };
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = split(w); }
+    else line = split(test);
+  }
+  if (line) lines.push(line);
+  return lines.slice(0, 5);
+}
+function drawHud(now, alpha) {
+  const p = S.payload, fs = clamp(W * 0.028, 9.5, 12);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.font = `${fs}px "JetBrains Mono", monospace`;
+  ctx.fillStyle = rgb(C.mute, 0.85 * alpha);
+  const x = Math.max(14, (W - 760) / 2), y = VIEW.hudTop;
+  const deg = ((CAM.th * 180 / Math.PI) % 360 + 360) % 360;
+  ctx.fillText(`@${p.t} · 2026.12.25 · from ${p.f || '비밀 산타'}`, x, y);
+  ctx.fillText(`rotation ${deg.toFixed(2).padStart(6, ' ')}°`, x, y + fs * 1.45);
+  ctx.fillText(`lights ${S.lightsShown}`, x + fs * 13, y + fs * 1.45);
+  ctx.fillText(`letters ${Math.floor(S.letters).toLocaleString('en-US')}`, x, y + fs * 2.9);
+  // timer, top corner
+  const t = (now - S.flyAt) / 1000;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = rgb(C.berry, 0.8 * alpha);
+  ctx.fillText(`t ${Math.max(0, t).toFixed(2).padStart(5, '0')}s`, 14, VIEW.sceneTop - fs * 1.6 + (REC.on ? fs * 1.6 : 0));
+}
+function drawPanel(now, alpha) {
+  const x0 = Math.max(0, (W - 800) / 2), w = Math.min(W, 800), top = VIEW.panelTop, bottom = VIEW.panelBottom;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = rgb(mix(C.night, [0, 0, 0], 0.25)); ctx.fillRect(x0, top, w, bottom - top);
+  ctx.fillStyle = rgb(mix(C.night, C.mute, 0.25)); ctx.fillRect(x0, top, w, 1);
+  const fs = clamp(W * 0.03, 10, 13), lh = fs * 1.55, px = x0 + 14;
+  ctx.textBaseline = 'top';
+  ctx.font = `600 ${fs}px "JetBrains Mono", monospace`;
+  ctx.textAlign = 'left'; ctx.fillStyle = rgb(C.frost);
+  ctx.fillText('js  letter.js', px, top + 8);
+  ctx.textAlign = 'right'; ctx.font = `${fs}px "JetBrains Mono", monospace`;
+  const status = S.phase === 'lit' ? 'done' : 'running';
+  ctx.fillStyle = rgb(C.mute); ctx.fillText(`${status} · ${Math.round(S.fps)} fps`, x0 + w - 14, top + 8);
+  const sw = ctx.measureText(`${status} · ${Math.round(S.fps)} fps`).width;
+  ctx.fillStyle = rgb(S.phase === 'lit' ? C.pine : C.candle);
+  ctx.beginPath(); ctx.arc(x0 + w - 14 - sw - 9, top + 8 + fs * 0.55, 3.2, 0, 6.283); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x0, top + lh + 10, w, bottom - top - lh - 14); ctx.clip();
+  const y0 = top + lh + 12, rows = Math.floor((bottom - y0) / lh);
+  ctx.textAlign = 'left';
+  if (S.phase !== 'lit') {
+    // the source scrolls past while it runs; the current line is marked
+    const L = S.lines, cur = Math.floor((now - S.runAt) / 260) % L.length;
+    const start = clamp(cur - Math.floor(rows / 2), 0, Math.max(0, L.length - rows));
+    for (let r = 0; r < rows && start + r < L.length; r++) {
+      const li = start + r, y = y0 + r * lh;
+      if (li === cur) { ctx.fillStyle = 'rgba(239,111,108,0.14)'; ctx.fillRect(x0, y - 2, w, lh); }
+      ctx.font = `${fs}px "JetBrains Mono", monospace`;
+      ctx.fillStyle = rgb(C.com); ctx.fillText(String(li + 1).padStart(3, ' '), px, y);
+      let x = px + fs * 2.6;
+      for (const [t, kind] of L[li]) { ctx.fillStyle = rgb(C[kind]); ctx.fillText(t, x, y); x += ctx.measureText(t).width; }
+    }
+  } else {
+    // output: the letter itself, typed into the terminal
+    const p = S.payload, el = now - S.litAt;
+    const shown = Math.floor(clamp((el - 400) / 1600, 0, 1) * seg(p.m).length);
+    ctx.font = `${fs}px "JetBrains Mono", monospace`;
+    ctx.fillStyle = rgb(C.mute); ctx.fillText('> letter.open()', px, y0);
+    ctx.fillStyle = rgb(C.candle); ctx.fillText(`To. ${p.t}`, px, y0 + lh);
+    const mfs = clamp(W * 0.044, 14, 20);
+    ctx.font = `700 ${mfs}px "Gowun Batang", serif`;
+    ctx.fillStyle = rgb(C.frost);
+    let y = y0 + lh * 2 + 2;
+    for (const ln of wrapText(seg(p.m).slice(0, shown).join(''), w - 28)) { ctx.fillText(ln, px, y); y += mfs * 1.4; }
+    if (shown >= seg(p.m).length) {
+      ctx.font = `${fs}px "JetBrains Mono", monospace`;
+      ctx.fillStyle = rgb(C.mute); ctx.fillText(`From. ${p.f || '비밀 산타'}`, px, y + 2);
+    } else if (Math.floor(now / 300) % 2) { ctx.fillStyle = rgb(C.candle); ctx.fillRect(px, y, 7, mfs); }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+function drawWatermark() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = `400 ${Math.max(9, W * 0.026)}px "JetBrains Mono", monospace`;
+  ctx.fillStyle = rgb(C.mute, 0.8);
+  ctx.fillText('CODE LETTER · 코드 편지', W / 2, H - Math.max(14, H * 0.025));
+}
+
+/* ---------- main frame ---------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(50, now - last); last = now;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = rgb(C.night); ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+  drawSnow(dt, now);
+  if (S.mode === 'letter' && S.lines) drawLetter(now, dt);
+  if (REC.on) drawWatermark();
+  if (S.mode === 'compose') drawPreview(now);
+  requestAnimationFrame(frame);
+}
+function renderScene(now, fl, lit, litEl, k3, floorA) {
+  const sc = S.sc, { cols, rows, zb, own, kind, val } = G;
+  zb.fill(-1e9); kind.fill(0);
+  const gx = v => Math.floor(v / G.cw), gy = v => Math.floor((v - G.top) / G.ch);
+  // floor
+  if (floorA > 0) {
+    for (let i = 0; i < FLOOR.n; i++) {
+      const q = proj(FLOOR.x[i], 1.02, FLOOR.z[i], 1);
+      const c = gx(q[0]), r = gy(q[1]);
+      if (c < 0 || r < 0 || c >= cols || r >= rows) continue;
+      const k = r * cols + c;
+      if (q[2] > zb[k]) { zb[k] = q[2]; kind[k] = 2; val[k] = q[2]; }
+    }
+  }
+  // shape
+  const Lx = -0.42, Ly = -0.55, Lz = 0.72;
+  let shownLights = 0;
+  for (let i = 0; i < sc.n; i++) {
+    if (!lit && fl < sc.reveal[i]) continue;
+    const q = proj(sc.x[i], sc.y[i], sc.z[i], k3);
+    const c = gx(q[0]), r = gy(q[1]);
+    if (c < 0 || r < 0 || c >= cols || r >= rows) continue;
+    const k = r * cols + c;
+    if (q[2] <= zb[k]) continue;
+    const nx = sc.nx[i], ny = sc.ny[i], nz = sc.nz[i];
+    const x1 = nx * CAM.c + nz * CAM.s, z1 = -nx * CAM.s + nz * CAM.c;
+    const y2 = ny * CAM.cp + z1 * CAM.sp, z2 = -ny * CAM.sp + z1 * CAM.cp;
+    let b = 0.38 + 0.62 * Math.max(0, x1 * Lx + y2 * Ly + z2 * Lz);
+    b *= 0.68 + 0.32 * clamp((q[2] + 0.6) / 1.2, 0, 1);
+    const age = lit ? 9999 : fl - sc.reveal[i];
+    if (age < 260) b = Math.min(1, b + (1 - age / 260) * 0.8);
+    zb[k] = q[2]; kind[k] = 1; own[k] = i; val[k] = b;
+  }
+  // draw cells
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = G.font;
+  let drawn = 0;
+  const lightCells = [];
+  for (let r = 0; r < rows; r++) {
+    const y = G.top + r * G.ch + G.ch / 2;
+    let lastLight = -9;
+    for (let c = 0; c < cols; c++) {
+      const k = r * cols + c, kd = kind[k];
+      if (!kd) continue;
+      const x = c * G.cw + G.cw / 2;
+      if (kd === 2) {
+        const d = clamp((val[k] + 1.6) / 3.2, 0, 1);
+        if (d < 0.08) continue;
+        ctx.fillStyle = FLOOR_COL[Math.floor(d * 15 * floorA)];
+        ctx.fillText(d > 0.72 ? '=' : d > 0.45 ? '-' : '.', x, y);
+        drawn++;
+        continue;
+      }
+      const i = own[k], b = val[k], type = sc.type[i];
+      if (type === 1 && sc.glyph[i] && c - lastLight >= 3) { lightCells.push(x, y, i, b); lastLight = c; continue; }
+      let lvl = Math.round(b * 15), ch;
+      if (type === 2) {
+        const tw = lit ? 0.75 + 0.25 * Math.sin(now * 0.004 + i) : 1;
+        lvl = Math.round(clamp(b * 1.3 * tw, 0.35, 1) * 15); ch = b > 0.55 ? '@' : 'o';
+      } else if (type === 1) { ch = '*'; lvl = Math.max(lvl, 10); }
+      else ch = RAMP[clamp(Math.floor(b * RAMP.length) + sc.jit[i], 0, RAMP.length - 1)];
+      ctx.fillStyle = type === 1 ? PAL.cache[palId(LIGHT_COL)][lvl] : PAL.cache[sc.col[i]][lvl];
+      ctx.fillText(ch, x, y);
+      drawn++;
+    }
+  }
+  // garland letters: drawn on a cleared patch so each one reads
+  ctx.font = G.lightFont;
+  for (let j = 0; j < lightCells.length; j += 4) {
+    const x = lightCells[j], y = lightCells[j + 1], i = lightCells[j + 2], b = lightCells[j + 3];
+    const tw = lit ? 0.7 + 0.3 * Math.sin(now * 0.003 + i * 1.7) : 1;
+    ctx.fillStyle = rgb(C.night); ctx.fillRect(x - G.cw * 1.1, y - G.ch * 0.55, G.cw * 2.2, G.ch * 1.1);
+    ctx.fillStyle = rgb(mix(C.night, LIGHT_COL, clamp(0.35 + b * 0.75, 0, 1) * tw));
+    ctx.fillText(sc.glyph[i], x, y + G.ch * 0.04);
+  }
+  shownLights = lightCells.length / 4;
+  // ornament glow, kept small so the characters stay sharp
+  if (lit || fl > 0) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (const o of sc.orns) {
+      if (!lit && fl < 300 + (1 - o.y) * 2600) continue;
+      const q = proj(o.x, o.y, o.z, k3);
+      if (q[2] < -0.05) continue;
+      const tw = lit ? 0.6 + 0.4 * Math.sin(now * 0.003 + o.x * 40) : 0.6, r = G.cw * 3.2 * q[3];
+      ctx.globalAlpha = 0.28 * tw;
+      ctx.drawImage(spriteFor(o.c), q[0] - r, q[1] - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  S.lightsShown = shownLights;
+  S.letters += drawn;
+}
+function drawLetter(now, dt) {
+  const code = S.code, chars = code.chars;
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  if (dt > 0) S.fps = lerp(S.fps, 1000 / dt, 0.05);
+
+  if (S.phase === 'typing') {
+    const el = now - S.tStart;
+    let n = S.typed;
+    while (n < chars.length && S.schedule[n] <= el) { if (!chars[n].space && n % 2 === 0) tick(); n++; }
+    S.typed = n;
+    ctx.font = codeFont(code.sz);
+    for (let i = 0; i < n; i++) if (!chars[i].space) { ctx.fillStyle = rgb(C[chars[i].kind]); ctx.fillText(chars[i].ch, chars[i].x, chars[i].y); }
+    const nx = n < chars.length ? chars[n] : chars[chars.length - 1];
+    if (Math.floor(now / 400) % 2 === 0 || n < chars.length) {
+      ctx.fillStyle = rgb(C.candle, 0.9);
+      ctx.fillRect(nx.x, nx.y - code.sz * 0.85, code.sz * 0.55, code.sz * 1.05);
+    }
+    if (n >= chars.length && el > S.typingDone + 450) { S.phase = 'run'; S.runAt = now; $('skipHint').hidden = true; }
+    return;
+  }
+
+  camFrame(dt);
+  const runEl = now - S.runAt, promptChars = seg(PROMPT), pStep = reduce ? 5 : 32;
+  const promptDone = promptChars.length * pStep + 420;
+  if (S.phase === 'run' && runEl > promptDone) {
+    S.phase = 'fly'; S.flyAt = now; S.flash = 1;
+    bell(SCALE[0], 0, 0.3, 2.2); bell(SCALE[3], 0.02, 0.18, 2.2);
+  }
+  const fl = S.phase === 'run' ? -1 : now - S.flyAt, def = S.def;
+  const lit = S.phase === 'lit', litEl = lit ? now - S.litAt : 0;
+  let k3 = 1;
+  if (lit && !reduce) {
+    if (def.finale === 'beat') k3 = 1 + 0.05 * beatPulse(litEl);
+    else if (def.finale === 'breathe') k3 = 1 + 0.012 * Math.sin(litEl * 0.002);
+  }
+  const uiA = S.phase === 'run' ? clamp(runEl / 600, 0, 1) : 1;
+  renderScene(now, fl, lit, litEl, k3, uiA);
+
+  if (lit && def.finale === 'star') {
+    const a = easeOutBack(clamp(litEl / 650, 0, 1));
+    const q = proj(0, -0.03, 0, k3);
+    drawStar(q[0], q[1], G.cw * 2.4 * q[3] * a, clamp(litEl / 300, 0, 1), now);
+  }
+
+  // the code block: letters stay put until it is their turn to fly
+  const codeA = S.phase === 'run' ? 1 : clamp(1 - fl / 3200, 0, 1) * 0.9 + 0.1;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  if (S.phase !== 'lit' || litEl < 400) {
+    const pShown = Math.min(promptChars.length, Math.floor(runEl / pStep));
+    ctx.font = codeFont(code.sz);
+    ctx.fillStyle = rgb(C.candle, S.phase === 'run' ? 1 : clamp(1 - fl / 500, 0, 1));
+    ctx.fillText(promptChars.slice(0, pShown).join(''), code.x0, code.promptY);
+  }
+  const chimeVol = hasBgm() ? 0.06 : 0.14, chimeGap = hasBgm() ? 160 : 85;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  let curFont = '';
+  for (const p of S.parts) {
+    const c = chars[p.ci];
+    const e = S.phase === 'run' ? 0 : clamp((fl - p.delay) / p.dur, 0, 1);
+    if (e >= 1) {
+      if (!p.arrived) {
+        p.arrived = true;
+        if (now - A.lastChime > chimeGap) { A.lastChime = now; bell(SCALE[Math.floor(clamp(1 - S.sc.y[p.tj], 0, 0.999) * SCALE.length)], 0, chimeVol, 1.3); }
+      }
+      continue;
+    }
+    const k = easeInOut(e);
+    const T = proj(S.sc.x[p.tj], S.sc.y[p.tj], S.sc.z[p.tj], k3);
+    const sx = c.x + c.w / 2, sy = c.y - code.sz * 0.35;
+    const mx = (sx + T[0]) / 2 + p.bend, my = Math.min(sy, T[1]) - p.lift;
+    const x = (1 - k) * (1 - k) * sx + 2 * (1 - k) * k * mx + k * k * T[0];
+    const y = (1 - k) * (1 - k) * sy + 2 * (1 - k) * k * my + k * k * T[1];
+    const font = codeFont(Math.round(lerp(code.sz, G.fs, k) * 2) / 2);
+    if (font !== curFont) { ctx.font = font; curFont = font; }
+    ctx.fillStyle = rgb(e > 0 ? mix(p.col, C.frost, k * 0.5) : p.col, e > 0 ? 1 : codeA);
+    ctx.fillText(p.ch, x, y);
+  }
+
+  drawHud(now, uiA);
+  drawPanel(now, uiA);
+
+  if (S.phase === 'fly' && fl > S.sc.flyEnd && S.parts.every(p => p.arrived)) {
+    S.phase = 'lit'; S.litAt = now;
+    const v = hasBgm() ? 0.14 : 0.3;
+    [0, 4, 7, 9].forEach((i, j) => bell(SCALE[i], j * 0.11, v, 2.6));
+    launch(W * 0.18, VIEW.sceneTop + VIEW.h * 0.15, 700); launch(W * 0.82, VIEW.sceneTop + VIEW.h * 0.1, 1100);
+  }
+  if (lit) {
+    if (REC.on) {
+      const marks = [2400, 3400, 4300];
+      while (S.autoFx < marks.length && litEl > marks[S.autoFx]) {
+        launch(W * (0.2 + Math.random() * 0.6), VIEW.sceneTop + VIEW.h * (0.05 + Math.random() * 0.2));
+        S.autoFx++;
+      }
+      if (litEl > 7500) stopRecording();
+    } else if (litEl > 2600 && !S.shown.end) {
+      S.shown.end = 1; show('tapHint'); show('endBar');
+    }
+  }
+
+  drawFx(dt);
+
+  if (S.flash > 0) {
+    ctx.fillStyle = rgb(C.frost, S.flash * 0.25);
+    ctx.fillRect(0, 0, W, H);
+    S.flash = Math.max(0, S.flash - dt / 260);
+  }
+}
+function show(id) { const el = $(id); el.hidden = false; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
+
+/* =========================================================
+   Video recording (9:16, canvas + music box audio)
+   ========================================================= */
+const MIMES = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+function startRecording() {
+  if (!window.MediaRecorder || !cv.captureStream) { flashMsg('이 브라우저는 영상 녹화를 지원하지 않아요. 크롬이나 사파리 최신 버전에서 열어 주세요.'); return; }
+  audioInit();
+  REC.mime = MIMES.find(m => { try { return MediaRecorder.isTypeSupported(m); } catch { return false; } }) || '';
+  REC.on = true; REC.cancelled = false; REC.chunks = [];
+  document.body.classList.add('recording');
+  $('recBar').hidden = false;
+  if (S.payload.b && S.payload.b.y) { try { YTM.player && YTM.player.pauseVideo(); } catch { /* ignore */ } }
+  resize();
+  const tracks = [...cv.captureStream(30).getVideoTracks()];
+  if (A.ctx && A.ctx.createMediaStreamDestination) {
+    REC.dest = A.ctx.createMediaStreamDestination();
+    A.master.connect(REC.dest);
+    tracks.push(...REC.dest.stream.getAudioTracks());
+  }
+  try {
+    REC.mr = new MediaRecorder(new MediaStream(tracks), REC.mime ? { mimeType: REC.mime, videoBitsPerSecond: 6e6 } : undefined);
+  } catch {
+    REC.mr = new MediaRecorder(new MediaStream(tracks));
+  }
+  REC.mr.ondataavailable = e => { if (e.data && e.data.size) REC.chunks.push(e.data); };
+  REC.mr.onstop = finishRecording;
+  REC.mr.start(250);
+  run();
+}
+function stopRecording() {
+  if (!REC.on) return;
+  REC.on = false;
+  try { REC.mr.state !== 'inactive' && REC.mr.stop(); } catch { finishRecording(); }
+}
+function finishRecording() {
+  if (REC.dest) { try { A.master.disconnect(REC.dest); } catch { /* ignore */ } REC.dest = null; }
+  document.body.classList.remove('recording');
+  $('recBar').hidden = true;
+  resize();
+  if (REC.cancelled || !REC.chunks.length) { show('endBar'); return; }
+  const type = (REC.mr && REC.mr.mimeType) || REC.mime || 'video/webm';
+  const ext = /mp4/.test(type) ? 'mp4' : 'webm';
+  const blob = new Blob(REC.chunks, { type: type.split(';')[0] });
+  REC.result = { blob, ext };
+  const v = $('saveVideo');
+  if (v.src) URL.revokeObjectURL(v.src);
+  v.src = URL.createObjectURL(blob);
+  const notes = [`${(blob.size / 1048576).toFixed(1)}MB · ${ext.toUpperCase()} · 720×1280`];
+  if (ext === 'webm') notes.push('인스타그램이나 아이폰에 올리기 전에 MP4 변환이 필요할 수 있어요.');
+  if (S.payload.b && S.payload.b.y) notes.push('유튜브 노래는 영상에 담기지 않아요.');
+  $('saveNote').textContent = notes.join(' ');
+  $('saveMsg').textContent = '';
+  $('saveSheet').hidden = false;
+  $('saveBtn').focus();
+  S.shown.end = 1; show('tapHint'); show('endBar');
+}
+let dlCap = null;
+function getDownloads() {
+  if (dlCap) return dlCap;
+  dlCap = (window.claude && typeof window.claude.use === 'function')
+    ? Promise.race([window.claude.use('downloads').catch(() => null), new Promise(r => setTimeout(() => r(null), 3000))])
+    : Promise.resolve(null);
+  return dlCap;
+}
+async function saveVideo() {
+  if (!REC.result) return;
+  const { blob, ext } = REC.result;
+  const name = `code-letter-${new Date().toISOString().slice(0, 10)}.${ext}`;
+  const msg = t => { $('saveMsg').textContent = t; };
+  const dl = await getDownloads();
+  if (dl) {
+    try { await dl.save({ filename: name, data: blob }); msg('저장했어요.'); }
+    catch (e) { msg(e && e.code === 'declined' ? '저장을 취소했어요.' : '이 화면에서는 저장할 수 없어요. 배포된 주소에서 다시 시도해 주세요.'); }
+    return;
+  }
+  try {
+    const file = new File([blob], name, { type: blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: '코드 편지' });
+      msg('공유 메뉴에서 "동영상 저장"을 고르면 사진첩에 들어가요.');
+      return;
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  msg('다운로드 폴더에 저장했어요.');
+}
+function flashMsg(t) { $('tapHint').textContent = t; show('tapHint'); }
+
+/* =========================================================
+   Input: drag to turn the formation, tap for fireworks
+   ========================================================= */
+let ptr = null;
+cv.addEventListener('pointerdown', e => {
+  if (S.mode !== 'letter') return;
+  ptr = { id: e.pointerId, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, lt: performance.now(), moved: false };
+  try { cv.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+});
+cv.addEventListener('pointermove', e => {
+  if (!ptr || e.pointerId !== ptr.id) return;
+  if (!ptr.moved && Math.hypot(e.clientX - ptr.x0, e.clientY - ptr.y0) > 7) ptr.moved = true;
+  if (!ptr.moved || (S.phase !== 'fly' && S.phase !== 'lit')) return;
+  const now = performance.now(), dx = e.clientX - ptr.lx, dy = e.clientY - ptr.ly, dtm = Math.max(8, now - ptr.lt);
+  CAM.drag = true;
+  CAM.th += dx * 0.008;
+  CAM.ph = clamp(CAM.ph + dy * 0.004, -0.2, 0.7);
+  CAM.spin = clamp(dx * 0.008 / dtm, -0.006, 0.006);
+  ptr.lx = e.clientX; ptr.ly = e.clientY; ptr.lt = now;
+});
+function endPtr(e) {
+  if (!ptr || e.pointerId !== ptr.id) return;
+  const p = ptr; ptr = null; CAM.drag = false;
+  if (p.moved || S.mode !== 'letter') return;
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (S.phase === 'typing') skipTyping(performance.now());
+  else if (S.phase === 'lit') launch(x, Math.min(y, H * 0.75));
+}
+cv.addEventListener('pointerup', endPtr);
+cv.addEventListener('pointercancel', e => { if (ptr && e.pointerId === ptr.id) { ptr = null; CAM.drag = false; } });
+$('runBtn').addEventListener('click', run);
+document.addEventListener('keydown', e => {
+  if (!$('saveSheet').hidden && e.key === 'Escape') { $('saveSheet').hidden = true; return; }
+  if (S.mode === 'letter' && !$('intro').hidden && e.key === 'Enter' && !$('runBtn').disabled) { e.preventDefault(); run(); }
+  else if (S.mode === 'letter' && S.phase === 'typing' && (e.key === ' ' || e.key === 'Enter')) skipTyping(performance.now());
+  else if (S.mode === 'letter' && (S.phase === 'lit' || S.phase === 'fly') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) CAM.spin = (e.key === 'ArrowLeft' ? -1 : 1) * 0.003;
+});
+$('muteBtn').addEventListener('click', () => {
+  A.muted = !A.muted;
+  $('muteBtn').textContent = A.muted ? 'sound off' : 'sound on';
+  if (A.master) A.master.gain.value = A.muted ? 0 : 0.32;
+});
+$('replayBtn').addEventListener('click', run);
+$('recBtn').addEventListener('click', () => { $('tapHint').textContent = '드래그하면 돌아가고, 누르면 불꽃이 터져요'; startRecording(); });
+$('recCancel').addEventListener('click', () => { REC.cancelled = true; stopRecording(); });
+$('saveBtn').addEventListener('click', saveVideo);
+$('saveClose').addEventListener('click', () => { $('saveSheet').hidden = true; });
+$('editBtn').addEventListener('click', () => openCompose());
+$('replyBtn').addEventListener('click', () => {
+  if (S.preview) { openCompose(); makeLink(); return; }
+  const p = S.payload;
+  openCompose({ t: p.f || '', f: p.t, m: '' });
+  $('fMsg').focus();
+});
+
+/* =========================================================
+   Compose
+   ========================================================= */
+const fTo = $('fTo'), fFrom = $('fFrom'), fMsg = $('fMsg');
+const F = { shape: 'tree', image: null, raster: null, sens: 48, music: 'jingle' };
+function counters() {
+  $('cTo').textContent = `${seg(fTo.value).length}/10`;
+  $('cFrom').textContent = `${seg(fFrom.value).length}/10`;
+  $('cMsg').textContent = `${seg(fMsg.value).length}/60`;
+}
+function dirty() { $('result').hidden = true; $('formErr').hidden = true; }
+[fTo, fFrom, fMsg].forEach(el => el.addEventListener('input', () => { counters(); dirty(); }));
+
+function currentShapeSpec() {
+  if (F.shape === 'emoji') { const e = seg(($('fEmoji').value || '').trim())[0]; return e ? { e } : null; }
+  if (F.shape === 'image') return F.image ? { i: { w: F.image.w, h: F.image.h, d: b64(F.image.cells) } } : null;
+  return F.shape;
+}
+// rotating 3D preview of the chosen formation
+const pv = $('shapePrev'), pctx = pv.getContext('2d');
+const PV = { spec: undefined, def: null, form: null };
+function previewSpec() {
+  const spec = currentShapeSpec(), key = JSON.stringify(spec);
+  if (key === PV.spec) return;
+  PV.spec = key;
+  PV.def = spec ? resolveShape(spec) : null;
+  if (PV.def && F.shape === 'emoji' && !emojiShape(spec.e)) PV.def = null;
+  PV.form = PV.def ? sample3(PV.def, 420) : null;
+  $('prevInfo').textContent = PV.def ? `${PV.def.label} · 글자 ${PV.def.N}개 · 드래그로 돌려 보기` : '미리보기';
+}
+let pvDrag = null, pvTh = -0.5, pvPh = 0.25;
+pv.addEventListener('pointerdown', e => { pvDrag = { x: e.clientX, y: e.clientY }; try { pv.setPointerCapture(e.pointerId); } catch { /* ignore */ } });
+pv.addEventListener('pointermove', e => { if (!pvDrag) return; pvTh += (e.clientX - pvDrag.x) * 0.012; pvPh = clamp(pvPh + (e.clientY - pvDrag.y) * 0.006, -0.3, 0.8); pvDrag = { x: e.clientX, y: e.clientY }; });
+pv.addEventListener('pointerup', () => { pvDrag = null; });
+let pvLast = 0;
+function drawPreview(now) {
+  const dt = Math.min(50, now - (pvLast || now)); pvLast = now;
+  previewSpec();
+  pctx.setTransform(2, 0, 0, 2, 0, 0);
+  pctx.fillStyle = rgb(C.night); pctx.fillRect(0, 0, 150, 150);
+  if (!PV.form) {
+    pctx.fillStyle = rgb(C.mute); pctx.font = '12px "IBM Plex Sans KR", sans-serif'; pctx.textAlign = 'center';
+    pctx.fillText(F.shape === 'image' ? '사진을 골라 주세요' : '이모지를 넣어 주세요', 75, 78);
+    return;
+  }
+  if (!pvDrag && !reduce) pvTh += dt * 0.0006;
+  const c = Math.cos(pvTh), s = Math.sin(pvTh), cp = Math.cos(pvPh), sp = Math.sin(pvPh);
+  const sc = 112 / Math.max(1, 2 * PV.form.rMax * 0.95, 1.05), D = 2.6;
+  const arr = PV.form.pts.map((p, i) => {
+    const X = p.x, Y = p.y - 0.5, Z = p.z;
+    const x1 = X * c + Z * s, z1 = -X * s + Z * c, y2 = Y * cp + z1 * sp, z2 = -Y * sp + z1 * cp, f = D / (D - z2);
+    return { x: 75 + x1 * sc * f, y: 75 + y2 * sc * f, z: z2, f, col: p.r === 'trunk' ? REG.trunk : colorFor(p.r, p.y, i) };
+  }).sort((a, b) => a.z - b.z);
+  pctx.globalCompositeOperation = 'lighter';
+  for (const q of arr) {
+    const dn = clamp((q.z + 0.55) / 1.1, 0, 1);
+    pctx.fillStyle = rgb(q.col, 0.25 + 0.75 * dn);
+    pctx.beginPath(); pctx.arc(q.x, q.y, 1.1 * q.f, 0, 6.283); pctx.fill();
+  }
+  pctx.globalCompositeOperation = 'source-over';
+}
+function setShape(v) {
+  F.shape = v;
+  $('emojiSub').hidden = v !== 'emoji';
+  $('imageSub').hidden = v !== 'image';
+  dirty();
+}
+document.querySelectorAll('input[name=shape]').forEach(r => r.addEventListener('change', () => setShape(r.value)));
+$('fEmoji').addEventListener('input', dirty);
+function processImage() {
+  if (!F.raster) return;
+  F.image = toCells(F.raster, F.sens);
+  const pct = Math.round(F.image.count / (F.image.w * F.image.h) * 100);
+  $('imgInfo').textContent = F.image.useAlpha
+    ? `투명 배경을 인식했어요. 윤곽만 남겼어요. (${F.image.w}×${F.image.h})`
+    : `가장자리 색을 배경으로 보고 지웠어요. 그림이 ${pct}%를 차지해요. 너무 많이 지워지면 강도를 낮춰 보세요.`;
+  dirty();
+}
+$('fImage').addEventListener('change', async e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  try {
+    const bmp = await createImageBitmap(file);
+    F.raster = rasterize(bmp, bmp.width, bmp.height, 40);
+    processImage();
+  } catch {
+    $('imgInfo').textContent = '이 파일은 읽을 수 없어요. PNG나 JPG 이미지를 골라 주세요.';
+  }
+});
+$('fSens').addEventListener('input', e => { F.sens = +e.target.value; $('sensVal').textContent = F.sens; processImage(); });
+
+function setMusic(v) {
+  F.music = v;
+  $('ytSub').hidden = v !== 'yt';
+  $('musicNote').textContent = v === 'yt' ? '유튜브 주소를 붙여 넣어 주세요.' : v === 'none' ? '글자가 자리를 잡을 때 종소리만 나요.' : '오르골 소리로 연주돼요. 고르면 몇 초간 들려드려요.';
+  dirty();
+  bgmStop();
+  if (MEL[v]) { audioInit(); bgmStart(v, 6); }
+}
+document.querySelectorAll('input[name=music]').forEach(r => r.addEventListener('change', () => setMusic(r.value)));
+$('fYt').addEventListener('input', () => {
+  const v = $('fYt').value.trim(), r = v ? parseYT(v) : null;
+  $('ytState').textContent = !v ? '' : r ? `인식됨 · ${r.s ? r.s + '초부터' : '처음부터'}` : '주소를 알아볼 수 없어요';
+  dirty();
+});
+
+function formPayload() {
+  const p = { t: fTo.value.trim(), f: fFrom.value.trim(), m: fMsg.value.replace(/\s+/g, ' ').trim() };
+  let err = !p.t ? '받는 사람 이름을 적어 주세요.' : !p.m ? '하고 싶은 말을 한 줄 이상 적어 주세요.' : '';
+  const spec = currentShapeSpec();
+  if (!err && !spec) err = F.shape === 'image' ? '모양으로 쓸 사진을 골라 주세요.' : '이모지를 하나 넣어 주세요.';
+  if (!err && F.shape === 'emoji' && !emojiShape(spec.e)) err = '이 이모지는 모양을 읽을 수 없어요. 다른 이모지를 넣어 주세요.';
+  p.s = spec;
+  if (F.music === 'yt') {
+    const y = parseYT($('fYt').value || '');
+    if (!err && !y) err = '유튜브 주소를 확인해 주세요. youtu.be 또는 youtube.com 주소를 넣으면 돼요.';
+    p.b = y || 'none';
+  } else p.b = F.music;
+  $('formErr').textContent = err; $('formErr').hidden = !err;
+  return err ? null : p;
+}
+let ownHash = false;
+async function makeLink() {
+  const p = formPayload(); if (!p) return;
+  $('makeBtn').disabled = true;
+  try {
+    const code = 'C-' + await pack(p);
+    const link = shareBase() + '#' + code;
+    ownHash = true;
+    try { history.replaceState(null, '', '#' + code); } catch { /* ignore */ }
+    setTimeout(() => { ownHash = false; }, 0);
+    $('linkOut').value = link;
+    $('copyMsg').textContent = link.length > 1800 ? '사진 모양이 들어가서 링크가 길어요. 카톡과 DM에서는 그대로 보내도 열려요.' : '';
+    $('result').hidden = false;
+  } finally { $('makeBtn').disabled = false; }
+}
+$('form').addEventListener('submit', e => { e.preventDefault(); makeLink(); });
+$('previewBtn').addEventListener('click', () => { const p = formPayload(); if (p) { bgmStop(); openLetter(sanitize(p), true); } });
+$('copyBtn').addEventListener('click', () => {
+  const v = $('linkOut').value;
+  const done = () => { $('copyMsg').textContent = '복사했어요. 카톡이나 DM에 붙여 넣어 보내세요.'; };
+  const fallback = () => { $('linkOut').select(); $('copyMsg').textContent = '링크를 선택해 두었어요. 길게 눌러 복사하세요.'; };
+  try { navigator.clipboard.writeText(v).then(done, fallback); } catch { fallback(); }
+});
+function openCompose(prefill) {
+  if (REC.on) { REC.cancelled = true; stopRecording(); }
+  S.mode = 'compose'; S.phase = 'idle'; S.lines = null; S.def = null;
+  bgmStop(); ytStop();
+  resetLetterUI();
+  $('letter').hidden = true; $('muteBtn').hidden = true; $('compose').hidden = false; $('saveSheet').hidden = true;
+  if (prefill) { fTo.value = prefill.t; fFrom.value = prefill.f; fMsg.value = prefill.m; $('result').hidden = true; }
+  counters();
+  window.scrollTo(0, 0);
+}
+
+/* ---------- route ---------- */
+async function route() {
+  const p = await readLink();
+  if (p && p !== 'bad') return openLetter(p, false);
+  openCompose();
+  if (p === 'bad') { $('formErr').textContent = '링크가 잘렸거나 손상됐어요. 보낸 사람에게 다시 받아 주세요.'; $('formErr').hidden = false; }
+}
+window.addEventListener('hashchange', () => { if (!ownHash) route(); });
+window.addEventListener('resize', resize);
+resize();
+counters();
+route();
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
